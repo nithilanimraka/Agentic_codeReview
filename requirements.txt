@@ -1,0 +1,14 @@
+langgraph
+langchain-core
+langchain-groq
+ipython
+langchain_openai
+unidiff==0.7.5
+PyGithub==2.6.1
+openai==1.66.3
+pydantic==2.10.6
+requests==2.32.3
+python-dotenv==1.0.1
+fastapi==0.115.11
+uvicorn==0.34.0
+github==1.2.7
