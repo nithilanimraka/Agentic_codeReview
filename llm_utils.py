@@ -56,13 +56,13 @@ structured_openai_llm = llm_openai.with_structured_output(FinalReviews)
 
 # Schema for structured output to use in planning
 class ReviewData(BaseModel):
-        fileName: str = Field(description="The name of the file that has an issue")
+        fileName: str = Field(description="The name of the file that has an issue", required=True)
         start_line_with_prefix: str = Field(description="The starting line number in the file (REQUIRED). \
-                                            ")
+                                            If the start_line is from the new file, indicate it with a '+' prefix, or if it is from the old file, indicate it with a '-' prefix", required=True)
         end_line_with_prefix: str = Field(description="The ending line number in the file (REQUIRED). \
-                                          ")
-        codeSegmentToFix: str = Field(description="The code segment that needs to be fixed from code diff")
-        issue: str = Field(description="The issue on the code segment")
+                                          If the end_line is from the new file, indicate it with a '+' prefix, or if it is from the old file, indicate it with a '-' prefix", required=True)
+        codeSegmentToFix: str = Field(description="The code segment that needs to be fixed from code diff", required=True)
+        issue: str = Field(description="The issue on the code segment", required=True)
 
 class ReviewDatas(BaseModel):
     reviewDatas: List[ReviewData] = Field(description="Reviews of Data of the Code.",)
@@ -72,12 +72,18 @@ structured_llm = llm_groq.with_structured_output(ReviewDatas)
 def line_numbers_handle(start_line_with_prefix, end_line_with_prefix):
     value1 = start_line_with_prefix
     print("before remove prefix start line:", value1)
-    start_line = int(value1.replace("+", "").strip())  # Remove '+' and strip spaces
+    if(start_line_with_prefix[0]=='-'): 
+        start_line = int(value1.replace("-", "").strip())  # Remove '+' and strip spaces
+    else:
+        start_line = int(value1.replace("+", "").strip())
     print("after removing prefix start line:", start_line)
 
     value2 = end_line_with_prefix
     print("before remove prefix end line:", value2)
-    end_line = int(value2.replace("+", "").strip()) 
+    if(end_line_with_prefix[0]=='-'):
+        end_line = int(value2.replace("-", "").strip())
+    else:
+        end_line = int(value2.replace("+", "").strip()) 
     print("after removing prefix end line:", end_line)
     print()
 
