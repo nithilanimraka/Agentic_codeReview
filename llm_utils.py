@@ -134,6 +134,7 @@ error_prompt = ChatPromptTemplate.from_messages([
         Examples for end_line_with_prefix when the start_line is from old file: "-1, -5, -22, -44" 
 
         VERY IMPORTANT:  
+        - Always give ONLY the codeSegment that needs to be fixed for codeSegmentToFix. Don't provide a lot of trailing and preceding code.
         - Don’t create issues on your own for the sake of providing outputs. If there are none, don’t produce outputs.
                     
     """), 
@@ -165,6 +166,7 @@ security_prompt = ChatPromptTemplate.from_messages([
         Examples for end_line_with_prefix when the start_line is from old file: "-1, -5, -22, -44" 
 
         VERY IMPORTANT:  
+        - Always give ONLY the codeSegment that needs to be fixed for codeSegmentToFix. Don't provide a lot of trailing and preceding code.
         - Don’t create issues on your own for the sake of providing outputs. If there are none, don’t produce outputs.
       """),
     ("human", "Analyze the following code diff and provide issues if exist:\n{PR_data}"),
@@ -195,6 +197,7 @@ performance_prompt = ChatPromptTemplate.from_messages([
         Examples for end_line_with_prefix when the start_line is from old file: "-1, -5, -22, -44" 
 
         VERY IMPORTANT:  
+        - Always give ONLY the codeSegment that needs to be fixed for codeSegmentToFix. Don't provide a lot of trailing and preceding code.
         - Don’t create issues on your own for the sake of providing outputs. If there are none, don’t produce outputs.
     """),
     ("human", "Analyze the following code diff and provide issues if exist:\n{PR_data}"),
@@ -223,6 +226,7 @@ quality_prompt = ChatPromptTemplate.from_messages([
         Examples for end_line_with_prefix when the start_line is from old file: "-1, -5, -22, -44" 
 
         VERY IMPORTANT:  
+        - Always give ONLY the codeSegment that needs to be fixed for codeSegmentToFix. Don't provide a lot of trailing and preceding code.
         - Don’t create issues on your own for the sake of providing outputs. If there are none, don’t produce outputs. 
     """),
     ("human", "Analyze the following code diff and provide issues if exist:\n{PR_data}"),
@@ -251,6 +255,7 @@ other_prompt = ChatPromptTemplate.from_messages([
             Examples for end_line_with_prefix when the start_line is from old file: "-1, -5, -22, -44" 
 
             VERY IMPORTANT:
+            - Always give ONLY the codeSegment that needs to be fixed for codeSegmentToFix. Don't provide a lot of trailing and preceding code.
             - Don’t create issues on your own for the sake of providing outputs. If there are none, don’t produce outputs. """),
 ("human", "Analyze the following code diff and provide issues if exist:\n{PR_data}"),
 ])
