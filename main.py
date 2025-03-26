@@ -83,15 +83,8 @@ async def webhook(request: Request, x_hub_signature: str = Header(None)):
                         comment_body += f"```{prog_lang}\n{review['suggestedCode']}\n```"
 
                     #Check whether the start_line and end_line are from new file or old file
-                    if(review['start_line_with_prefix'][0]=='-'): 
-                        var_startSide = "LEFT"
-                    else:
-                        var_startSide = "RIGHT"
-    
-                    if(review['end_line_with_prefix'][0]=='-'):
-                        var_side = "LEFT"
-                    else:
-                        var_side = "RIGHT"
+                    start_line_side = "LEFT" if review['start_line_with_prefix'][0] == '-' else "RIGHT"
+                    end_line_side = "LEFT" if review['end_line_with_prefix'][0] == '-' else "RIGHT"
 
                     if(start_line != end_line):
                         try:
@@ -101,8 +94,8 @@ async def webhook(request: Request, x_hub_signature: str = Header(None)):
                             path=review['fileName'],
                             start_line=start_line, #line number of the starting line of the code block
                             line=end_line, #line number of the ending line of the code block
-                            start_side=var_startSide,  #side of the starting line of the code block
-                            side=var_side,  # side of the ending line of the code block
+                            start_side=start_line_side,  #side of the starting line of the code block
+                            side=end_line_side,  # side of the ending line of the code block
                             )
                         except Exception as e:
                             print(f"Failed to post comments: {str(e)}")
@@ -118,7 +111,7 @@ async def webhook(request: Request, x_hub_signature: str = Header(None)):
                             commit=repo.get_commit(head_sha),
                             path=review['fileName'],
                             line=end_line,
-                            side=var_side, 
+                            side=end_line_side, 
                             )
                         except Exception as e:
                             print(f"Failed to post comments: {str(e)}")

@@ -1,6 +1,6 @@
 import os
 from typing import List, Dict, Optional, TypedDict,Annotated
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 import os
 from dotenv import load_dotenv
@@ -11,6 +11,7 @@ from langchain_core.runnables.graph import MermaidDrawMethod
 from IPython.display import display, Image
 from langchain_groq import ChatGroq
 from langchain_openai import ChatOpenAI
+import re
 
 import prompt_templates
 
@@ -38,33 +39,41 @@ llm_openai = ChatOpenAI(model="gpt-4o-2024-08-06",
 
 # Schema for structured output to use in planning
 class FinalReview(BaseModel):
-        fileName: str = Field(description="The name of the file that has an issue")
-        start_line_with_prefix: str = Field(description="The starting line number in the file (REQUIRED). \
+        fileName: str = Field(..., description="The name of the file that has an issue")
+        start_line_with_prefix: str = Field(..., description="The starting line number in the file (REQUIRED). \
                                             If the start_line is from the new file, indicate it with a '+' prefix, or if it is from the old file, indicate it with a '-' prefix")
-        end_line_with_prefix: str = Field(description="The ending line number in the file (REQUIRED). \
+        end_line_with_prefix: str = Field(..., description="The ending line number in the file (REQUIRED). \
                                           If the end_line is from the new file, indicate it with a '+' prefix, or if it is from the old file, indicate it with a '-' prefix")
-        codeSegmentToFix: str = Field(description="The code segment that needs to be fixed from code diff")
-        language: str = Field(description="The language of the code segment")
-        issue: str = Field(description="The issue on the code segment")
-        suggestion: str = Field(description="The suggestion to fix the code segment")
+        codeSegmentToFix: str = Field(..., description="The code segment that needs to be fixed from code diff")
+        language: str = Field(..., description="The language of the code segment")
+        issue: str = Field(..., description="The issue on the code segment")
+        suggestion: str = Field(..., description="The suggestion to fix the code segment")
         suggestedCode: Optional[str] = Field(None, description="The updated code segment for the fix")
-        severity: str = Field(description="The severity of the issue. Can be 'error', 'warning', or 'info'")
+        severity: str = Field(..., description="The severity of the issue. Can be 'error', 'warning', or 'info'")
 
 class FinalReviews(BaseModel):
-    finalReviews: List[FinalReview] = Field(description="Final Reviews of Data of the Code.",)
+    finalReviews: List[FinalReview] = Field(..., description="Final Reviews of Data of the Code.",)
 
 structured_openai_llm = llm_openai.with_structured_output(FinalReviews)
 
 
 # Schema for structured output to use in planning
 class ReviewData(BaseModel):
-        fileName: str = Field(description="The name of the file that has an issue", required=True)
-        start_line_with_prefix: str = Field(description="The starting line number in the file (REQUIRED). \
-                                            If the start_line is from the new file, indicate it with a '+' prefix, or if it is from the old file, indicate it with a '-' prefix", required=True)
-        end_line_with_prefix: str = Field(description="The ending line number in the file (REQUIRED). \
-                                          If the end_line is from the new file, indicate it with a '+' prefix, or if it is from the old file, indicate it with a '-' prefix", required=True)
-        codeSegmentToFix: str = Field(description="The code segment that needs to be fixed from code diff", required=True)
-        issue: str = Field(description="The issue on the code segment", required=True)
+        model_config = ConfigDict(extra='forbid', strict=True)  # Add strict validation
+
+        fileName: str = Field(..., description="The name of the file that has an issue")
+        start_line_with_prefix: str = Field(..., description="The starting line number in the file (REQUIRED). \
+                                            If the start_line is from the new file, indicate it with a '+' prefix, or if it is from the old file, indicate it with a '-' prefix")
+        end_line_with_prefix: str = Field(..., description="The ending line number in the file (REQUIRED). \
+                                          If the end_line is from the new file, indicate it with a '+' prefix, or if it is from the old file, indicate it with a '-' prefix")
+        codeSegmentToFix: str = Field(..., description="The code segment that needs to be fixed from code diff")
+        issue: str = Field(..., description="The issue on the code segment")
+
+        @field_validator('start_line_with_prefix', 'end_line_with_prefix')
+        def validate_line_prefix(cls, value):
+            if not re.match(r'^[+-]\d+$', value):
+                raise ValueError("Must start with '+' or '-' followed by digits")
+            return value
 
 class ReviewDatas(BaseModel):
     reviewDatas: List[ReviewData] = Field(description="Reviews of Data of the Code.",)
@@ -160,10 +169,8 @@ def aggregator(state: State):
 
     for review in error_issues:
 
-        start_line, end_line = line_numbers_handle(review.start_line_with_prefix, review.end_line_with_prefix)
-
         error_lines.append(f"File: {review.fileName}")
-        error_lines.append(f"Lines: {start_line} to {end_line}")
+        error_lines.append(f"Lines: {review.start_line_with_prefix} to {review.end_line_with_prefix}")
         error_lines.append("Code Segment:")
         error_lines.append(review.codeSegmentToFix)
         error_lines.append(f"Issue: {review.issue}")
@@ -174,10 +181,8 @@ def aggregator(state: State):
 
     for review in security_issues:
 
-        start_line, end_line = line_numbers_handle(review.start_line_with_prefix, review.end_line_with_prefix)
-
         security_lines.append(f"File: {review.fileName}")
-        security_lines.append(f"Lines: {start_line} to {end_line}")
+        security_lines.append(f"Lines: {review.start_line_with_prefix} to {review.end_line_with_prefix}")
         security_lines.append("Code Segment:")
         security_lines.append(review.codeSegmentToFix)
         security_lines.append(f"Issue: {review.issue}")
@@ -188,10 +193,8 @@ def aggregator(state: State):
 
     for review in performance_issues:
 
-        start_line, end_line = line_numbers_handle(review.start_line_with_prefix, review.end_line_with_prefix)
-
         performance_lines.append(f"File: {review.fileName}")
-        performance_lines.append(f"Lines: {start_line} to {end_line}")
+        performance_lines.append(f"Lines: {review.start_line_with_prefix} to {review.end_line_with_prefix}")
         performance_lines.append("Code Segment:")
         performance_lines.append(review.codeSegmentToFix)
         performance_lines.append(f"Issue: {review.issue}")
@@ -202,10 +205,8 @@ def aggregator(state: State):
 
     for review in quality_issues:
 
-        start_line, end_line = line_numbers_handle(review.start_line_with_prefix, review.end_line_with_prefix)
-
         quality_lines.append(f"File: {review.fileName}")
-        quality_lines.append(f"Lines: {start_line} to {end_line}")
+        quality_lines.append(f"Lines: {review.start_line_with_prefix} to {review.end_line_with_prefix}")
         quality_lines.append("Code Segment:")
         quality_lines.append(review.codeSegmentToFix)
         quality_lines.append(f"Issue: {review.issue}")
@@ -216,10 +217,8 @@ def aggregator(state: State):
 
     for review in other_issues:
 
-        start_line, end_line = line_numbers_handle(review.start_line_with_prefix, review.end_line_with_prefix)
-
         other_lines.append(f"File: {review.fileName}")
-        other_lines.append(f"Lines: {start_line} to {end_line}")
+        other_lines.append(f"Lines: {review.start_line_with_prefix} to {review.end_line_with_prefix}")
         other_lines.append("Code Segment:")
         other_lines.append(review.codeSegmentToFix)
         other_lines.append(f"Issue: {review.issue}")
