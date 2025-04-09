@@ -5,10 +5,7 @@ from langchain_core.prompts import ChatPromptTemplate
 # precision, and handling of no issues.
 _common_output_format_instructions = """
 --- OUTPUT FORMATTING RULES ---
-You MUST respond in JSON format containing a single key "reviewDatas".
-The value of "reviewDatas" MUST be a list of JSON objects.
-EACH object in the "reviewDatas" list MUST contain ALL of the following keys:
-  - "fileName": string (REQUIRED. The name of the file with the issue. Use "N/A" if not file-specific.)
+  - "fileName": string (REQUIRED. The name of the file with the issue.)
   - "start_line_with_prefix": string (REQUIRED. Start line prefixed with '+' for new file or '-' for old file.)
   - "end_line_with_prefix": string (REQUIRED. End line prefixed with '+' for new file or '-' for old file.)
   - "codeSegmentToFix": string (REQUIRED. The precise code snippet that needs fixing.)
@@ -21,7 +18,7 @@ Examples for end_line_with_prefix when the start_line is from new file: "+10, +2
 Examples for end_line_with_prefix when the start_line is from old file: "-1, -5, -22, -44" 
 
 VERY IMPORTANT:
-- Adherence to the above JSON structure and inclusion of ALL required fields in every object is MANDATORY.
+- Adherence to the above structure and inclusion of ALL required fields in every object is MANDATORY.
 - Line numbers MUST start with '+' (new file) or '-' (old file).
 - Be very precise about the 'codeSegmentToFix'.  It should be the exact code that needs to be fixed which has the issue. 
 - The 'codeSegmentToFix' starting line number should correspond to the 'start_line_with_prefix' and the ending line number should correspond to the 'end_line_with_prefix'.

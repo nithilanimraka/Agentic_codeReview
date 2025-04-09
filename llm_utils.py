@@ -1,6 +1,7 @@
 import os
 from typing import List, Dict, Optional, TypedDict,Annotated
 from pydantic import BaseModel, Field, field_validator, ValidationError, ConfigDict
+import logging 
 
 import os
 from dotenv import load_dotenv
@@ -15,6 +16,8 @@ import prompt_templates
 
 
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 groq_api_key = os.environ.get('GROQ_API_KEY')
 if not groq_api_key:
@@ -124,72 +127,72 @@ class State(TypedDict):
 def error_handle(state: State):
      messages = prompt_templates.error_prompt.format_messages(PR_data=state["PR_data"])
      try:
-         print("Invoking LLM for error handling...")
+         logging.info("Invoking LLM for error handling...")
          response = structured_llm.invoke(messages)
-         print(f"LLM call for error handling successful. Found {len(response.reviewDatas)} issues.")
+         logging.info(f"LLM call for error handling successful. Found {len(response.reviewDatas)} issues.")
          return {"error_issues": response.reviewDatas}
      except ValidationError as e:
-         print(f"Pydantic Validation Error in error_handle: {e}")
+         logging.error(f"Pydantic Validation Error in error_handle: {e}")
          # Log the specific failing input if possible (might require deeper langchain integration or modifying invoke)
          return {"error_issues": []} # Return empty list on validation failure
      except Exception as e:
-         print(f"Unexpected Error in error_handle: {e}", exc_info=True) # Log full traceback
+         logging.error(f"Unexpected Error in error_handle: {e}", exc_info=True) # Log full traceback
          return {"error_issues": []} # Return empty list on other errors
 
 def security_handle(state: State):
      messages = prompt_templates.security_prompt.format_messages(PR_data=state["PR_data"])
      try:
-         print("Invoking LLM for security handling...")
+         logging.info("Invoking LLM for security handling...")
          response = structured_llm.invoke(messages)
-         print(f"LLM call for security handling successful. Found {len(response.reviewDatas)} issues.")
+         logging.info(f"LLM call for security handling successful. Found {len(response.reviewDatas)} issues.")
          return {"security_issues": response.reviewDatas}
      except ValidationError as e:
-         print(f"Pydantic Validation Error in security_handle: {e}")
+         logging.error(f"Pydantic Validation Error in security_handle: {e}")
          return {"security_issues": []}
      except Exception as e:
-         print(f"Unexpected Error in security_handle: {e}", exc_info=True)
+         logging.error(f"Unexpected Error in security_handle: {e}", exc_info=True)
          return {"security_issues": []}
 
 def performance_handle(state: State):
      messages = prompt_templates.performance_prompt.format_messages(PR_data=state["PR_data"])
      try:
-         print("Invoking LLM for performance handling...")
+         logging.info("Invoking LLM for performance handling...")
          response = structured_llm.invoke(messages)
-         print(f"LLM call for performance handling successful. Found {len(response.reviewDatas)} issues.")
+         logging.info(f"LLM call for performance handling successful. Found {len(response.reviewDatas)} issues.")
          return {"performance_issues": response.reviewDatas}
      except ValidationError as e:
-         print(f"Pydantic Validation Error in performance_handle: {e}")
+         logging.error(f"Pydantic Validation Error in performance_handle: {e}")
          return {"performance_issues": []}
      except Exception as e:
-         print(f"Unexpected Error in performance_handle: {e}", exc_info=True)
+         logging.error(f"Unexpected Error in performance_handle: {e}", exc_info=True)
          return {"performance_issues": []}
 
 def quality_handle(state: State):
      messages = prompt_templates.quality_prompt.format_messages(PR_data=state["PR_data"])
      try:
-         print("Invoking LLM for quality handling...")
+         logging.info("Invoking LLM for quality handling...")
          response = structured_llm.invoke(messages)
-         print(f"LLM call for quality handling successful. Found {len(response.reviewDatas)} issues.")
+         logging.info(f"LLM call for quality handling successful. Found {len(response.reviewDatas)} issues.")
          return {"quality_issues": response.reviewDatas}
      except ValidationError as e:
-         print(f"Pydantic Validation Error in quality_handle: {e}")
+         logging.error(f"Pydantic Validation Error in quality_handle: {e}")
          return {"quality_issues": []}
      except Exception as e:
-         print(f"Unexpected Error in quality_handle: {e}", exc_info=True)
+         logging.error(f"Unexpected Error in quality_handle: {e}", exc_info=True)
          return {"quality_issues": []}
 
 def other_handle(state: State):
      messages = prompt_templates.other_prompt.format_messages(PR_data=state["PR_data"])
      try:
-         print("Invoking LLM for other handling...")
+         logging.info("Invoking LLM for other handling...")
          response = structured_llm.invoke(messages)
-         print(f"LLM call for other handling successful. Found {len(response.reviewDatas)} issues.")
+         logging.info(f"LLM call for other handling successful. Found {len(response.reviewDatas)} issues.")
          return {"other_issues": response.reviewDatas}
      except ValidationError as e:
-         print(f"Pydantic Validation Error in other_handle: {e}")
+         logging.error(f"Pydantic Validation Error in other_handle: {e}")
          return {"other_issues": []}
      except Exception as e:
-         print(f"Unexpected Error in other_handle: {e}", exc_info=True)
+         logging.error(f"Unexpected Error in other_handle: {e}", exc_info=True)
          return {"other_issues": []}
 
 # Proper aggregator implementation
