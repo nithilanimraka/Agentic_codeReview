@@ -1,14 +1,12 @@
 import os
 from typing import List, Dict, Optional, TypedDict,Annotated
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, ValidationError, ConfigDict
 
 import os
 from dotenv import load_dotenv
 from typing import TypedDict, List
 from langgraph.graph import StateGraph, START,END
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables.graph import MermaidDrawMethod
-from IPython.display import display, Image
 from langchain_groq import ChatGroq
 from langchain_openai import ChatOpenAI
 import re
@@ -124,108 +122,108 @@ class State(TypedDict):
 
 #nodes
 def error_handle(state: State):
-     messages= prompt_templates.error_prompt.format_messages(PR_data=state["PR_data"])
-     response = structured_llm.invoke(messages)
-     
-     return {"error_issues": response.reviewDatas}
+     messages = prompt_templates.error_prompt.format_messages(PR_data=state["PR_data"])
+     try:
+         print("Invoking LLM for error handling...")
+         response = structured_llm.invoke(messages)
+         print(f"LLM call for error handling successful. Found {len(response.reviewDatas)} issues.")
+         return {"error_issues": response.reviewDatas}
+     except ValidationError as e:
+         print(f"Pydantic Validation Error in error_handle: {e}")
+         # Log the specific failing input if possible (might require deeper langchain integration or modifying invoke)
+         return {"error_issues": []} # Return empty list on validation failure
+     except Exception as e:
+         print(f"Unexpected Error in error_handle: {e}", exc_info=True) # Log full traceback
+         return {"error_issues": []} # Return empty list on other errors
 
 def security_handle(state: State):
-     response = structured_llm.invoke(
-          prompt_templates.security_prompt.format_messages(PR_data=state["PR_data"])
-     )
-     return {"security_issues": response.reviewDatas}
+     messages = prompt_templates.security_prompt.format_messages(PR_data=state["PR_data"])
+     try:
+         print("Invoking LLM for security handling...")
+         response = structured_llm.invoke(messages)
+         print(f"LLM call for security handling successful. Found {len(response.reviewDatas)} issues.")
+         return {"security_issues": response.reviewDatas}
+     except ValidationError as e:
+         print(f"Pydantic Validation Error in security_handle: {e}")
+         return {"security_issues": []}
+     except Exception as e:
+         print(f"Unexpected Error in security_handle: {e}", exc_info=True)
+         return {"security_issues": []}
 
 def performance_handle(state: State):
-     response = structured_llm.invoke(
-          prompt_templates.performance_prompt.format_messages(PR_data=state["PR_data"])
-     )
-     return {"performance_issues": response.reviewDatas}
+     messages = prompt_templates.performance_prompt.format_messages(PR_data=state["PR_data"])
+     try:
+         print("Invoking LLM for performance handling...")
+         response = structured_llm.invoke(messages)
+         print(f"LLM call for performance handling successful. Found {len(response.reviewDatas)} issues.")
+         return {"performance_issues": response.reviewDatas}
+     except ValidationError as e:
+         print(f"Pydantic Validation Error in performance_handle: {e}")
+         return {"performance_issues": []}
+     except Exception as e:
+         print(f"Unexpected Error in performance_handle: {e}", exc_info=True)
+         return {"performance_issues": []}
 
 def quality_handle(state: State):
-     response = structured_llm.invoke(
-          prompt_templates.quality_prompt.format_messages(PR_data=state["PR_data"])
-     )
-     return {"quality_issues": response.reviewDatas}
+     messages = prompt_templates.quality_prompt.format_messages(PR_data=state["PR_data"])
+     try:
+         print("Invoking LLM for quality handling...")
+         response = structured_llm.invoke(messages)
+         print(f"LLM call for quality handling successful. Found {len(response.reviewDatas)} issues.")
+         return {"quality_issues": response.reviewDatas}
+     except ValidationError as e:
+         print(f"Pydantic Validation Error in quality_handle: {e}")
+         return {"quality_issues": []}
+     except Exception as e:
+         print(f"Unexpected Error in quality_handle: {e}", exc_info=True)
+         return {"quality_issues": []}
 
 def other_handle(state: State):
-     response = structured_llm.invoke(
-          prompt_templates.other_prompt.format_messages(PR_data=state["PR_data"])
-     )
-     return {"other_issues": response.reviewDatas}
+     messages = prompt_templates.other_prompt.format_messages(PR_data=state["PR_data"])
+     try:
+         print("Invoking LLM for other handling...")
+         response = structured_llm.invoke(messages)
+         print(f"LLM call for other handling successful. Found {len(response.reviewDatas)} issues.")
+         return {"other_issues": response.reviewDatas}
+     except ValidationError as e:
+         print(f"Pydantic Validation Error in other_handle: {e}")
+         return {"other_issues": []}
+     except Exception as e:
+         print(f"Unexpected Error in other_handle: {e}", exc_info=True)
+         return {"other_issues": []}
 
 # Proper aggregator implementation
 def aggregator(state: State):
-    error_lines=["Error and Exception handling issues:\n"]
-    security_lines=["Security vulnerability issues:\n"]
-    performance_lines=["Performance issues:\n"]
-    quality_lines=["Quality issues:\n"]
-    other_lines=["Other isses:\n"]
 
-    error_issues = state["error_issues"]
-    security_issues = state["security_issues"]
-    performance_issues = state["performance_issues"]
-    quality_issues = state["quality_issues"]
-    other_issues = state["other_issues"]
+    error_issues = state.get("error_issues", []) # Use .get for safety
+    security_issues = state.get("security_issues", [])
+    performance_issues = state.get("performance_issues", [])
+    quality_issues = state.get("quality_issues", [])
+    other_issues = state.get("other_issues", [])
 
-    for review in error_issues:
+    # --- Combine loops for slightly better readability ---
+    def format_reviews(title: str, reviews: List[ReviewData], lines_list: List[str]):
+        lines_list.append(title)
+        if not reviews: # Handle case where a category might have no issues
+             lines_list.append("No issues found in this category.")
+             lines_list.append("---")
+             return '\n'.join(lines_list)
 
-        error_lines.append(f"File: {review.fileName}")
-        error_lines.append(f"Lines: {review.start_line_with_prefix} to {review.end_line_with_prefix}")
-        error_lines.append("Code Segment:")
-        error_lines.append(review.codeSegmentToFix)
-        error_lines.append(f"Issue: {review.issue}")
-        error_lines.append("---")  # Separator
+        for review in reviews:
+            lines_list.append(f"File: {review.fileName}")
+            lines_list.append(f"Lines: {review.start_line_with_prefix} to {review.end_line_with_prefix}")
+            lines_list.append("Code Segment:")
+            lines_list.append(review.codeSegmentToFix)
+            lines_list.append(f"Issue: {review.issue}")
+            lines_list.append("---")
+        return '\n'.join(lines_list)
 
-    # Join all lines into a single string with newlines
-    error_str = '\n'.join(error_lines)
+    error_str = format_reviews("Error and Exception handling issues:", error_issues, [])
+    security_str = format_reviews("Security vulnerability issues:", security_issues, [])
+    performance_str = format_reviews("Performance issues:", performance_issues, [])
+    quality_str = format_reviews("Quality issues:", quality_issues, [])
+    other_str = format_reviews("Other issues:", other_issues, []) # Fixed typo "isses"
 
-    for review in security_issues:
-
-        security_lines.append(f"File: {review.fileName}")
-        security_lines.append(f"Lines: {review.start_line_with_prefix} to {review.end_line_with_prefix}")
-        security_lines.append("Code Segment:")
-        security_lines.append(review.codeSegmentToFix)
-        security_lines.append(f"Issue: {review.issue}")
-        security_lines.append("---")  # Separator
-
-    # Join all lines into a single string with newlines
-    security_str = '\n'.join(security_lines)
-
-    for review in performance_issues:
-
-        performance_lines.append(f"File: {review.fileName}")
-        performance_lines.append(f"Lines: {review.start_line_with_prefix} to {review.end_line_with_prefix}")
-        performance_lines.append("Code Segment:")
-        performance_lines.append(review.codeSegmentToFix)
-        performance_lines.append(f"Issue: {review.issue}")
-        performance_lines.append("---")  # Separator
-
-    # Join all lines into a single string with newlines
-    performance_str = '\n'.join(performance_lines)
-
-    for review in quality_issues:
-
-        quality_lines.append(f"File: {review.fileName}")
-        quality_lines.append(f"Lines: {review.start_line_with_prefix} to {review.end_line_with_prefix}")
-        quality_lines.append("Code Segment:")
-        quality_lines.append(review.codeSegmentToFix)
-        quality_lines.append(f"Issue: {review.issue}")
-        quality_lines.append("---")  # Separator
-
-    # Join all lines into a single string with newlines
-    quality_str = '\n'.join(quality_lines)
-
-    for review in other_issues:
-
-        other_lines.append(f"File: {review.fileName}")
-        other_lines.append(f"Lines: {review.start_line_with_prefix} to {review.end_line_with_prefix}")
-        other_lines.append("Code Segment:")
-        other_lines.append(review.codeSegmentToFix)
-        other_lines.append(f"Issue: {review.issue}")
-        other_lines.append("---")  # Separator
-
-    # Join all lines into a single string with newlines
-    other_str = '\n'.join(other_lines)
     final_str= error_str+"\n\n"+security_str+"\n\n"+performance_str+"\n\n"+quality_str+"\n\n"+other_str
 
     return {"all_issues": final_str}
@@ -258,7 +256,7 @@ def invoke(structured_diff_text: str):
     parallel_workflow = parallel_builder.compile()
 
     # Show workflow
-    display(Image(parallel_workflow.get_graph().draw_mermaid_png()))
+    # display(Image(parallel_workflow.get_graph().draw_mermaid_png()))
 
     state = parallel_workflow.invoke({"PR_data": structured_diff_text})
     final_issues=state["all_issues"]
@@ -285,9 +283,12 @@ final_prompt= ChatPromptTemplate.from_messages([
 
 
 def final_review(pr_data:str) -> List[Dict]:
+    print("Entered final review function")
      
     final_issues=invoke(pr_data)
-    print(final_issues)
+    print("--- Collected Issues ---")
+    print(final_issues) # Print the aggregated issues before sending to OpenAI
+    print("------------------------")
 
     final_response= structured_openai_llm.invoke(final_prompt.format_messages(PR_data=pr_data, Issues=final_issues))
 
