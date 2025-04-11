@@ -129,6 +129,7 @@ def error_handle(state: State):
      try:
          logging.info("Invoking LLM for error handling...")
          response = structured_llm.invoke(messages)
+         print(response)
          logging.info(f"LLM call for error handling successful. Found {len(response.reviewDatas)} issues.")
          return {"error_issues": response.reviewDatas}
      except ValidationError as e:
