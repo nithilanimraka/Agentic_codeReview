@@ -41,11 +41,11 @@ llm_openai = ChatOpenAI(model="gpt-4o-2024-08-06",
 # Schema for structured output to use in planning
 class FinalReview(BaseModel):
         fileName: str = Field(..., description="The name of the file that has an issue")
+        codeSegmentToFix: str = Field(..., description="The code segment that needs to be fixed from code diff")
         start_line_with_prefix: str = Field(..., description="The starting line number in the file (REQUIRED). \
                                             If the start_line is from the new file, indicate it with a '+' prefix, or if it is from the old file, indicate it with a '-' prefix")
         end_line_with_prefix: str = Field(..., description="The ending line number in the file (REQUIRED). \
                                           If the end_line is from the new file, indicate it with a '+' prefix, or if it is from the old file, indicate it with a '-' prefix")
-        codeSegmentToFix: str = Field(..., description="The code segment that needs to be fixed from code diff")
         language: str = Field(..., description="The language of the code segment")
         issue: str = Field(..., description="The issue on the code segment")
         suggestion: str = Field(..., description="The suggestion to fix the code segment")
@@ -63,11 +63,11 @@ class ReviewData(BaseModel):
         model_config = ConfigDict(extra='forbid', strict=True)  # Add strict validation
 
         fileName: str = Field(..., description="The name of the file that has an issue")
+        codeSegmentToFix: str = Field(..., description="The code segment that needs to be fixed from code diff")
         start_line_with_prefix: str = Field(..., description="The starting line number in the file (REQUIRED). \
                                             If the start_line is from the new file, indicate it with a '+' prefix, or if it is from the old file, indicate it with a '-' prefix")
         end_line_with_prefix: str = Field(..., description="The ending line number in the file (REQUIRED). \
                                           If the end_line is from the new file, indicate it with a '+' prefix, or if it is from the old file, indicate it with a '-' prefix")
-        codeSegmentToFix: str = Field(..., description="The code segment that needs to be fixed from code diff")
         issue: str = Field(..., description="The issue on the code segment")
 
         @field_validator('start_line_with_prefix', 'end_line_with_prefix')
