@@ -292,11 +292,11 @@ final_prompt= ChatPromptTemplate.from_messages([
             * Optionally, if practical, provide a corrected code snippet in `suggestedCode`. If not providing code, ensure this field is null.
       
         Important:
-         - Examples for start_line_with_prefix when the start_line is from new file: "+5, +2, +51, +61" 
-         - Examples for start_line_with_prefix when the start_line is from old file: "-8, -1, -56, -20" 
+         - Examples for start_line_with_prefix when the start line is from new file: "+5, +2, +51, +61" 
+         - Examples for start_line_with_prefix when the start line is from old file: "-8, -1, -56, -20" 
 
-         - Examples for end_line_with_prefix when the start_line is from new file: "+10, +2, +77, +65" 
-         - Examples for end_line_with_prefix when the start_line is from old file: "-1, -5, -22, -44" 
+         - Examples for end_line_with_prefix when the end line is from new file: "+10, +2, +77, +65" 
+         - Examples for end_line_with_prefix when the end line is from old file: "-1, -5, -22, -44" 
     """),
     ("human", "PR data:\n{PR_data} \n\n Issues related: {Issues}"),
 ])
