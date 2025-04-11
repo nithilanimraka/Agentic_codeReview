@@ -273,7 +273,23 @@ def invoke(structured_diff_text: str):
 
 final_prompt= ChatPromptTemplate.from_messages([
      ("system", """
-        You are an expert code reviewer. Based on the given Pull Request(PR) Data and the issues related to it, Analyze them and generate detailed review comments.
+        You are an expert code reviewer AI acting as a final synthesizer. Your goal is to transform raw identified issues into polished, actionable review comments suitable for a developer.
+
+        You will receive two pieces of information:
+        1.  `PR_data`: The complete code diff. Use this ONLY for context to understand the code surrounding an issue if necessary.
+        2.  `Issues`: A pre-processed list or summary of specific problems identified by specialist agents. Each problem in `Issues` includes:
+            * `File`: The filename.
+            * `Lines`: The start and end line numbers with prefixes (e.g., `+10 to +12`, `-5 to -5`).
+            * `Code Segment`: The exact code snippet related to the issue.
+            * `Issue`: A description of the problem found by the specialist agent.
+
+        Your Task:
+        Iterate through EACH problem described in the `Issues` input. For every single problem:
+        1.  **PRESERVE LOCATION (CRITICAL!):** You MUST extract and use the *exact* `fileName`, `start_line_with_prefix`, `end_line_with_prefix`, and `codeSegmentToFix` as provided for that problem within the `Issues` input. DO NOT modify, recalculate, or estimate these location details. The `start_line_with_prefix` and `end_line_with_prefix` MUST be copied verbatim (e.g., "+10", "-5").
+        2.  **ANALYZE & ENRICH:** Based on the provided `issue` description and `codeSegmentToFix` (using `PR_data` for context if needed):
+            * Identify the programming `language` of the `codeSegmentToFix`.
+            * Generate a clear, actionable `suggestion` explaining *how* the developer can fix the issue.
+            * Optionally, if practical, provide a corrected code snippet in `suggestedCode`. If not providing code, ensure this field is null.
       
         Important:
          - Examples for start_line_with_prefix when the start_line is from new file: "+5, +2, +51, +61" 

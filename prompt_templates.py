@@ -18,15 +18,15 @@ reviewDatas=[ReviewData(fileName='sample.py', start_line_with_prefix='+12', end_
         issue='The code calls the function with only one argument instead of two and then tries to concatenate an integer (result) with a string, which will cause a TypeError.')]
 --- END EXAMPLE ---
 
-Examples for start_line_with_prefix when the start_line is from new file: "+5, +2, +51, +61" 
-Examples for start_line_with_prefix when the start_line is from old file: "-8, -1, -56, -20" 
+Examples for start_line_with_prefix when the start line is from new file: "+5, +2, +51, +61" 
+Examples for start_line_with_prefix when the start line is from old file: "-8, -1, -56, -20" 
 
-Examples for end_line_with_prefix when the start_line is from new file: "+10, +2, +77, +65" 
-Examples for end_line_with_prefix when the start_line is from old file: "-1, -5, -22, -44" 
+Examples for end_line_with_prefix when the end line is from new file: "+10, +2, +77, +65" 
+Examples for end_line_with_prefix when the end line is from old file: "-1, -5, -22, -44" 
 
 VERY IMPORTANT:
 - Adherence to the above structure and inclusion of ALL required fields in every object is MANDATORY.
-- **CRITICAL LOCATION ACCURACY:** When you identify an issue within a specific code segment (`codeSegmentToFix`), you **MUST** extract the `fileName`, `start_line_with_prefix`, and `end_line_with_prefix` values **ONLY** from the file context block (e.g., `File: filename.py`) and line number markers (e.g., `[Line 123] + ...`) that **immediately precede** that specific code segment in the input diff provided. **Do NOT guess locations or use file/line information from other unrelated parts of the diff.** Ensure the line numbers extracted precisely correspond to the lines included in the `codeSegmentToFix`.
+- **CRITICAL LOCATION ACCURACY:** When you identify an issue within a specific code segment (`codeSegmentToFix`), you **MUST** extract the `fileName`, `start_line_with_prefix`, and `end_line_with_prefix` values **ONLY** from the file context block (e.g., `File: filename.py`) and line number markers (e.g., `[Line 123 ] + ...`) that **immediately precede** that specific code segment in the input diff provided. **Do NOT guess locations or use file/line information from other unrelated parts of the diff.** Ensure the line numbers extracted precisely correspond to the lines included in the `codeSegmentToFix`.
 - Line numbers MUST start with '+' (new file) or '-' (old file).
 - Note that lines starting with '-' are from the old file, that means that the code line is removed in the new file. Take this into concern when providing issues for the code diff.
 - Be very precise about the 'codeSegmentToFix'.  It should be the exact code that needs to be fixed which has the issue. 
