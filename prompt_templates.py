@@ -11,6 +11,12 @@ _common_output_format_instructions = """
   - "codeSegmentToFix": string (REQUIRED. The precise code snippet that needs fixing.)
   - "issue": string (REQUIRED. A clear description of the identified issue specific to your focus area.)
 
+--- EXAMPLE OF DESIRED OUTPUT STRUCTURE ---
+reviewDatas=[ReviewData(fileName='main.py', start_line_with_prefix='+32', end_line_with_prefix='+35',\
+      codeSegmentToFix='print("Before API CALL...")\\n\\n# Get analysis from OpenAI\\ncompletion = client.beta.chat.completions.parse(\\n    model="gpt-4o-2024-08-06",\\n    messages=[\\n        {{"role": "system", "content": "You are an experienced code reviewer."}},\\n        {{"role": "user", "content": prompt}}\\n    ],\\n    response_format=ReviewModel,\\n)',\
+        issue='Missing error handling around API call. No try/catch block to handle exceptions from the OpenAI API call. This could lead to uncaught exceptions and service crashes.')]
+--- END EXAMPLE ---
+
 Examples for start_line_with_prefix when the start_line is from new file: "+5, +2, +51, +61" 
 Examples for start_line_with_prefix when the start_line is from old file: "-8, -1, -56, -20" 
 
