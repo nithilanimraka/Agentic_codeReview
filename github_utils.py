@@ -144,9 +144,9 @@ def build_review_prompt_with_file_line_numbers(parsed_files: List[Dict]) -> str:
                 "-" if change["type"] == "removed" else
                 " " # Use space for context lines
             )
-            
+
             prompt_lines.append(
-                f"L{change['line_number']:<4} {sign} {change['content']}"
+                f"[Line {change['line_number']:<4}] {sign} {change['content']}"
             )
         prompt_lines.append("")
 

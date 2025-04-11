@@ -6,15 +6,16 @@ from langchain_core.prompts import ChatPromptTemplate
 _common_output_format_instructions = """
 --- OUTPUT FORMATTING RULES ---
   - "fileName": string (REQUIRED. The name of the file with the issue.)
-  - "start_line_with_prefix": string (REQUIRED. Start line prefixed with '+' for new file or '-' for old file.)
-  - "end_line_with_prefix": string (REQUIRED. End line prefixed with '+' for new file or '-' for old file.)
   - "codeSegmentToFix": string (REQUIRED. The precise code snippet that needs fixing.)
+  - "start_line_with_prefix": string (REQUIRED. Start line of the `codeSegmentToFix` prefixed with '+' for new file or '-' for old file.)
+  - "end_line_with_prefix": string (REQUIRED. End line of the `codeSegmentToFix` prefixed with '+' for new file or '-' for old file.)
   - "issue": string (REQUIRED. A clear description of the identified issue specific to your focus area.)
 
 --- EXAMPLE OF DESIRED OUTPUT STRUCTURE ---
-reviewDatas=[ReviewData(fileName='main.py', start_line_with_prefix='+32', end_line_with_prefix='+35',\
-      codeSegmentToFix='print("Before API CALL...")\\n\\n# Get analysis from OpenAI\\ncompletion = client.beta.chat.completions.parse(\\n    model="gpt-4o-2024-08-06",\\n    messages=[\\n        {{"role": "system", "content": "You are an experienced code reviewer."}},\\n        {{"role": "user", "content": prompt}}\\n    ],\\n    response_format=ReviewModel,\\n)',\
-        issue='Missing error handling around API call. No try/catch block to handle exceptions from the OpenAI API call. This could lead to uncaught exceptions and service crashes.')]
+#This example is provided to you **JUST TO IDENTIFY THE STRUCTURE OF THE OUTPUT, NOT THE CONTENT**
+reviewDatas=[ReviewData(fileName='sample.py', start_line_with_prefix='+12', end_line_with_prefix='+16',\
+      codeSegmentToFix='def add_numbers(a, b):\\n   return a + b\\n\\nresult = add_numbers(5)\\nprint("Result is: " + result)',\
+        issue='The code calls the function with only one argument instead of two and then tries to concatenate an integer (result) with a string, which will cause a TypeError.')]
 --- END EXAMPLE ---
 
 Examples for start_line_with_prefix when the start_line is from new file: "+5, +2, +51, +61" 
@@ -25,11 +26,14 @@ Examples for end_line_with_prefix when the start_line is from old file: "-1, -5,
 
 VERY IMPORTANT:
 - Adherence to the above structure and inclusion of ALL required fields in every object is MANDATORY.
+- **CRITICAL LOCATION ACCURACY:** When you identify an issue within a specific code segment (`codeSegmentToFix`), you **MUST** extract the `fileName`, `start_line_with_prefix`, and `end_line_with_prefix` values **ONLY** from the file context block (e.g., `File: filename.py`) and line number markers (e.g., `[Line 123] + ...`) that **immediately precede** that specific code segment in the input diff provided. **Do NOT guess locations or use file/line information from other unrelated parts of the diff.** Ensure the line numbers extracted precisely correspond to the lines included in the `codeSegmentToFix`.
 - Line numbers MUST start with '+' (new file) or '-' (old file).
+- Note that lines starting with '-' are from the old file, that means that the code line is removed in the new file. Take this into concern when providing issues for the code diff.
 - Be very precise about the 'codeSegmentToFix'.  It should be the exact code that needs to be fixed which has the issue. 
-- The 'codeSegmentToFix' starting line number should correspond to the 'start_line_with_prefix' and the ending line number should correspond to the 'end_line_with_prefix'.
+- The 'codeSegmentToFix' starting line number should correspond to the 'start_line_with_prefix' and the ending line number should correspond to the 'end_line_with_prefix' in the input diff provided.
 - Only report issues relevant to your specific focus area.
 - Do not create issues on your own for the sake of providing outputs. If there are none, do not produce outputs.
+
 --- END OUTPUT FORMATTING RULES ---
 """
 
@@ -71,6 +75,7 @@ You are an expert code reviewer **strictly focused on security vulnerabilities**
 - General error handling (e.g., missing try/catch) → handled by the error agent.
 - Slow code → handled by the performance agent.
 - Code style → handled by the quality agent.
+- version outdated issues (eg: libraries) since you do not have access to the latest versions.
 
 **Examples of issues to report**:
 - `query = f"SELECT * FROM users WHERE id = [user_input]"` (SQLi risk).
