@@ -24,17 +24,24 @@ Examples for start_line_with_prefix when the start line is from old file: "-8, -
 Examples for end_line_with_prefix when the end line is from new file: "+10, +2, +77, +65" 
 Examples for end_line_with_prefix when the end line is from old file: "-1, -5, -22, -44" 
 
+--- END OUTPUT FORMATTING RULES ---
+
 VERY IMPORTANT:
 - Adherence to the above structure and inclusion of ALL required fields in every object is MANDATORY.
+
+- **FOCUS ON THE RESULTING CODE:** Your primary goal is to review the code as it will exist *after* this Pull Request is merged. This means focusing on lines being added (`+` prefix) and context lines (` ` prefix).
+
+- **CRITICAL RULE: DO NOT REVIEW DELETED CODE IN ISOLATION:**
+    - Lines starting with `-` represent code that is being **DELETED**. It will **NOT** exist in the final merged code.
+    - **DO NOT report issues that exist *solely and entirely* within one or more lines prefixed with `-`**. For example, do not report a typo on a `-` line, or a potential bug within a block of code where *all* lines in that block start with `-`.
+    - You MAY refer to `-` lines if their *removal* directly causes a problem in the remaining (`+` or ` `) code (e.g., removing a variable definition causes a `NameError` later in a context line). In such cases, the `codeSegmentToFix` and the primary focus of the `issue` should be on the remaining code that is affected.
+
 - **CRITICAL LOCATION ACCURACY:** When you identify an issue within a specific code segment (`codeSegmentToFix`), you **MUST** extract the `fileName`, `start_line_with_prefix`, and `end_line_with_prefix` values **ONLY** from the file context block (e.g., `File: filename.py`) and line number markers (e.g., `[Line 123 ] + ...`) that **immediately precede** that specific code segment in the input diff provided. **Do NOT guess locations or use file/line information from other unrelated parts of the diff.** Ensure the line numbers extracted precisely correspond to the lines included in the `codeSegmentToFix`.
 - Line numbers MUST start with '+' (new file) or '-' (old file).
-- Note that lines starting with '-' are from the old file, that means that the code line is removed in the new file. Take this into concern when providing issues for the code diff.
 - Be very precise about the 'codeSegmentToFix'.  It should be the exact code that needs to be fixed which has the issue. 
 - The 'codeSegmentToFix' starting line number should correspond to the 'start_line_with_prefix' and the ending line number should correspond to the 'end_line_with_prefix' in the input diff provided.
 - Only report issues relevant to your specific focus area.
-- Do not create issues on your own for the sake of providing outputs. If there are none, do not produce outputs.
-
---- END OUTPUT FORMATTING RULES ---
+- Do not create issues on your own for the sake of providing outputs. If there are no issues, do not produce outputs, just return an empty list: `[]`.
 """
 
 # --- Error Handling Prompt ---
