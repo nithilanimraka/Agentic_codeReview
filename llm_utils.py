@@ -8,9 +8,10 @@ from dotenv import load_dotenv
 from typing import TypedDict, List
 from langgraph.graph import StateGraph, START,END
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_groq import ChatGroq
+# from langchain_groq import ChatGroq
 from langchain_openai import ChatOpenAI
 import re
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 import prompt_templates
 
@@ -19,18 +20,25 @@ load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-groq_api_key = os.environ.get('GROQ_API_KEY')
-if not groq_api_key:
-    raise ValueError("GROQ_API_KEY is not set")
+# groq_api_key = os.environ.get('GROQ_API_KEY')
+# if not groq_api_key:
+#     raise ValueError("GROQ_API_KEY is not set")
 
 openai_api_key = os.environ.get('OPENAI_API_KEY')
 if not openai_api_key:
     raise ValueError("OPENAI_API_KEY is not set")
 
-llm_groq = ChatGroq(
+gemini_api_key = os.environ.get('GEMINI_API_KEY')
+if not gemini_api_key:
+    raise ValueError("GEMINI_API_KEY is not set")
+
+llm_groq = ChatGoogleGenerativeAI(
+    model="gemini-2.0-flash",
+    google_api_key=gemini_api_key,
     temperature=0,
-    groq_api_key=groq_api_key,
-    model_name="deepseek-r1-distill-llama-70b"
+    max_tokens=None,
+    timeout=None,
+    max_retries=2,
 )
 
 llm_openai = ChatOpenAI(model="gpt-4o-2024-08-06",
@@ -129,8 +137,13 @@ def error_handle(state: State):
      try:
          logging.info("Invoking LLM for error handling...")
          response = structured_llm.invoke(messages)
-         print(response)
-         logging.info(f"LLM call for error handling successful. Found {len(response.reviewDatas)} issues.")
+         print("Error handling response: \n",response)
+         print("\n\n")
+         if(response == None):
+             logging.info("LLM call for error handling successful. Found 0 issues.")
+             return {"error_issues": []}
+         else:
+             logging.info(f"LLM call for error handling successful. Found {len(response.reviewDatas)} issues.")
          return {"error_issues": response.reviewDatas}
      except ValidationError as e:
          logging.error(f"Pydantic Validation Error in error_handle: {e}")
@@ -145,7 +158,13 @@ def security_handle(state: State):
      try:
          logging.info("Invoking LLM for security handling...")
          response = structured_llm.invoke(messages)
-         logging.info(f"LLM call for security handling successful. Found {len(response.reviewDatas)} issues.")
+         print("Security handling response: \n",response)
+         print("\n\n")
+         if(response == None):
+             logging.info("LLM call for security handling successful. Found 0 issues.")
+             return {"security_issues": []}
+         else:
+             logging.info(f"LLM call for security handling successful. Found {len(response.reviewDatas)} issues.")
          return {"security_issues": response.reviewDatas}
      except ValidationError as e:
          logging.error(f"Pydantic Validation Error in security_handle: {e}")
@@ -159,7 +178,13 @@ def performance_handle(state: State):
      try:
          logging.info("Invoking LLM for performance handling...")
          response = structured_llm.invoke(messages)
-         logging.info(f"LLM call for performance handling successful. Found {len(response.reviewDatas)} issues.")
+         print("Performance handling response: \n",response)
+         print("\n\n")
+         if(response == None):
+             logging.info("LLM call for performance handling successful. Found 0 issues.")
+             return {"performance_issues": []}
+         else:
+             logging.info(f"LLM call for performance handling successful. Found {len(response.reviewDatas)} issues.")
          return {"performance_issues": response.reviewDatas}
      except ValidationError as e:
          logging.error(f"Pydantic Validation Error in performance_handle: {e}")
@@ -173,7 +198,13 @@ def quality_handle(state: State):
      try:
          logging.info("Invoking LLM for quality handling...")
          response = structured_llm.invoke(messages)
-         logging.info(f"LLM call for quality handling successful. Found {len(response.reviewDatas)} issues.")
+         print("Quality handling response: \n",response)
+         print("\n\n")
+         if(response == None):
+             logging.info("LLM call for quality handling successful. Found 0 issues.")
+             return {"quality_issues": []}
+         else:
+             logging.info(f"LLM call for quality handling successful. Found {len(response.reviewDatas)} issues.")
          return {"quality_issues": response.reviewDatas}
      except ValidationError as e:
          logging.error(f"Pydantic Validation Error in quality_handle: {e}")
@@ -187,7 +218,13 @@ def other_handle(state: State):
      try:
          logging.info("Invoking LLM for other handling...")
          response = structured_llm.invoke(messages)
-         logging.info(f"LLM call for other handling successful. Found {len(response.reviewDatas)} issues.")
+         print("Other handling response: \n",response)
+         print("\n\n")
+         if(response == None):
+             logging.info("LLM call for other handling successful. Found 0 issues.")
+             return {"other_issues": []}
+         else:
+             logging.info(f"LLM call for other handling successful. Found {len(response.reviewDatas)} issues.")
          return {"other_issues": response.reviewDatas}
      except ValidationError as e:
          logging.error(f"Pydantic Validation Error in other_handle: {e}")
