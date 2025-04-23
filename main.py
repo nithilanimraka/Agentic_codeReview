@@ -1,5 +1,7 @@
+import os
 import json
 from fastapi import FastAPI, Request, Header,HTTPException
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 import requests
 
@@ -9,6 +11,8 @@ from authenticate_github import verify_signature, connect_repo
 from prTitle_analysis import analyze_pr_with_diff, update_faiss_store
 
 import logging
+
+from git_repo_mcp import stream_git_repo_query, QueryRequest
 
 # Configure the logger
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -186,3 +190,35 @@ def analyze_pr_summary(pr_title,code_diff):
             check_run.edit(status="completed", conclusion="failure", output={"title": "Analysis Error", "summary": f"Unexpected error during analysis: {str(analysis_err)}"})
 
     return feedback
+
+@app.post("/analyze")
+async def analyze_repository(request: QueryRequest):
+    """
+    Endpoint to receive repository path and query, and stream back the analysis.
+    """
+    print(f"Received request: repo_path='{request.repo_path}', query='{request.query}'")
+
+    # Basic validation (FastAPI handles Pydantic validation)
+    if not os.path.isdir(request.repo_path):
+         # Check if it's a valid directory *before* starting the stream
+         raise HTTPException(status_code=400, detail=f"Invalid repository path: {request.repo_path}")
+    if not request.query:
+        raise HTTPException(status_code=400, detail="Query cannot be empty.")
+
+    # Return a StreamingResponse, passing the async generator
+    return StreamingResponse(
+        stream_git_repo_query(request.repo_path, request.query),
+        media_type="text/plain" # Stream plain text deltas
+    )
+
+@app.get("/") # Simple root endpoint for testing
+async def read_root():
+    return {"message": "Git Analyzer FastAPI server is running. POST to /analyze"}
+
+
+# --- Server Execution (using uvicorn) ---
+if __name__ == "__main__":
+    import uvicorn
+    # Run the server on localhost, port 8000
+    # You might want to make host/port configurable
+    uvicorn.run(app, host="127.0.0.1", port=8000)
