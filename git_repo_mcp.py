@@ -116,6 +116,8 @@ async def stream_git_repo_query(directory_path: str, user_query: str):
                     # Yield each chunk of text as it comes in
                     yield event.data.delta
 
+            print("history list:", result.to_input_list()) 
+
             if result.trace:                               # will be None if tracing disabled
                 trace_url = f"https://platform.openai.com/traces/trace?trace_id={result.trace.trace_id}"
                 print(f"🔍  Full trace: {trace_url}")
