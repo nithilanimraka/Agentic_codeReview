@@ -1,6 +1,6 @@
 import os
 import json
-from fastapi import FastAPI, Request, Header,HTTPException
+from fastapi import FastAPI, Request, Header,HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 import requests
@@ -10,6 +10,15 @@ from github_utils import create_check_run, update_check_run, parse_diff_file_lin
 from authenticate_github import verify_signature, connect_repo
 from prTitle_analysis import analyze_pr_with_diff, update_faiss_store
 
+
+from tools import get_github_owner_repo, close_neo4j_driver, get_changed_files_from_pr
+from graph_workflow import execute_analysis
+from dotenv import load_dotenv
+from tools import initialize_neo4j_schema
+from contextlib import asynccontextmanager
+
+
+
 import logging
 
 from git_repo_mcp import stream_git_repo_query, QueryRequest
@@ -18,13 +27,21 @@ from git_repo_mcp import stream_git_repo_query, QueryRequest
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize Neo4j schema on startup
+    initialize_neo4j_schema()
+    yield
+    # Cleanup on shutdown remains the same
+
 app = FastAPI()
 load_dotenv()
 
 check_run = None  # Initialize globally
 
 @app.post("/webhook")
-async def webhook(request: Request, x_hub_signature: str = Header(None)):
+async def webhook(request: Request, x_hub_signature: str = Header(None), background_tasks: BackgroundTasks = BackgroundTasks):
     payload = await request.body()
     verify_signature(payload, x_hub_signature)
     payload_dict = json.loads(payload)
@@ -33,11 +50,18 @@ async def webhook(request: Request, x_hub_signature: str = Header(None)):
         owner = payload_dict["repository"]["owner"]["login"]
         repo_name = payload_dict["repository"]["name"]
         repo = connect_repo(owner, repo_name)
-        
+        pr = payload_dict.get("pull_request", {})
+        rp = payload_dict.get("repository", {})
+
+
         # Check if it's a pull_request event with action 'opened'
         if payload_dict.get("pull_request") and payload_dict.get("action") == "opened":
             pr_number = payload_dict["pull_request"]["number"]
             head_sha = payload_dict['pull_request']['head']['sha']
+            action = payload_dict.get("action")
+            base_branch = pr["base"]["ref"]
+            repo_url = rp["html_url"]
+        
 
             try:
                 # Create initial check run
@@ -167,6 +191,49 @@ async def webhook(request: Request, x_hub_signature: str = Header(None)):
                     
                 raise
 
+
+            # Get owner/repo
+            owner, repo_name = get_github_owner_repo(repo_url)
+            if not owner or not repo_name:
+                raise HTTPException(400, "Could not parse repository info")
+
+            logger.info(
+                f"Processing PR #{pr_number} in {owner}/{repo_name} "
+                f"(Action: {action}, Commit: {head_sha[:7]})"
+            )
+
+                # Filter relevant actions
+            if action not in ["opened", "reopened", "synchronize"]:
+                return {"status": "ignored", "reason": f"Action '{action}' not supported"}
+
+                # Fetch changed files
+            try:
+                changed_files = get_changed_files_from_pr(owner, repo_name, pr_number)
+                logger.info(f"Found {len(changed_files)} changed files")
+            except Exception as e:
+                logger.error(f"Failed to fetch changed files: {str(e)}")
+                raise HTTPException(502, "Could not retrieve PR files")
+
+            # Prepare analysis data
+            pr_data = {
+                "repo_url": repo_url,
+                "commit_sha": head_sha,
+                "base_branch": base_branch,
+                "pull_request_number": pr_number,
+                "changed_files": changed_files,
+                "owner": owner,
+                "repo": repo_name
+            }
+
+            # Trigger analysis
+            background_tasks.add_task(execute_analysis_and_handle_result, pr_data, structured_diff_text)
+            return {
+                "status": "analysis_started",
+                "pr_number": pr_number,
+                "repo": f"{owner}/{repo_name}"
+            }
+
+
             
     return {}
 
@@ -190,6 +257,29 @@ def analyze_pr_summary(pr_title,code_diff):
             check_run.edit(status="completed", conclusion="failure", output={"title": "Analysis Error", "summary": f"Unexpected error during analysis: {str(analysis_err)}"})
 
     return feedback
+
+
+async def execute_analysis_and_handle_result(pr_data: dict, structured_diff_text: str):
+    """Extract and return analysis components as prompts"""
+    try:
+        logger.info(f"Starting analysis for PR #{pr_data['pull_request_number']}")
+        results = execute_analysis(pr_data, structured_diff_text)
+        print("\n\nIn execute_analysis_and_handle_result")
+        print("dependency_analysis:\n")
+        print(results.get("dependency_analysis"))
+        
+        if "error" in results:
+            logger.error(f"Analysis failed: {results['error']}")
+            return None, None
+        
+        return {
+            "dependency_analysis": results.get("dependency_analysis")
+        }
+        
+    except Exception as e:
+        logger.error(f"Background analysis failed: {str(e)}", exc_info=True)
+        return None, None
+
 
 @app.post("/analyze")
 async def analyze_repository(request: QueryRequest):
