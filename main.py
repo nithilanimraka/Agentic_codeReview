@@ -230,7 +230,6 @@ async def end_session(request: EndSessionRequest):
         return {"status": "success", "message": f"Session {session_id} ended."}
     else:
         print(f"Session {session_id}: Attempted to delete non-existent session.")
-        # It's okay if the session doesn't exist (e.g., closed twice)
         return {"status": "not_found", "message": f"Session {session_id} not found."}
 
 
@@ -239,7 +238,6 @@ async def read_root():
     return {"message": "Git Analyzer FastAPI server is running. POST to /analyze"}
 
 
-# --- Server Execution ---
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)
