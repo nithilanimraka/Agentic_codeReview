@@ -4,6 +4,8 @@ from fastapi import FastAPI, Request, Header,HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 import requests
+import sys
+from contextlib import asynccontextmanager
 
 from llm_utils import final_review, line_numbers_handle
 from github_utils import create_check_run, update_check_run, parse_diff_file_line_numbers, build_review_prompt_with_file_line_numbers
@@ -11,11 +13,20 @@ from authenticate_github import verify_signature, connect_repo
 from prTitle_analysis import analyze_pr_with_diff, update_faiss_store
 
 
-from tools import get_github_owner_repo, close_neo4j_driver, get_changed_files_from_pr
-from graph_workflow import execute_analysis
-from dotenv import load_dotenv
-from tools import initialize_neo4j_schema
-from contextlib import asynccontextmanager
+from src.dependency_analysis import ai_agents
+from src.dependency_analysis import graph_workflow
+from src.dependency_analysis import tools
+
+load_dotenv()
+
+
+
+tools.get_github_owner_repo
+tools.close_neo4j_driver
+tools.get_changed_files_from_pr
+tools.initialize_neo4j_schema
+graph_workflow.execute_analysis
+
 
 
 
@@ -31,12 +42,11 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize Neo4j schema on startup
-    initialize_neo4j_schema()
+    tools.initialize_neo4j_schema()
     yield
     # Cleanup on shutdown remains the same
 
 app = FastAPI()
-load_dotenv()
 
 check_run = None  # Initialize globally
 
@@ -193,7 +203,7 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
 
 
             # Get owner/repo
-            owner, repo_name = get_github_owner_repo(repo_url)
+            owner, repo_name = tools.get_github_owner_repo(repo_url)
             if not owner or not repo_name:
                 raise HTTPException(400, "Could not parse repository info")
 
@@ -208,7 +218,7 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
 
                 # Fetch changed files
             try:
-                changed_files = get_changed_files_from_pr(owner, repo_name, pr_number)
+                changed_files = tools.get_changed_files_from_pr(owner, repo_name, pr_number)
                 logger.info(f"Found {len(changed_files)} changed files")
             except Exception as e:
                 logger.error(f"Failed to fetch changed files: {str(e)}")
@@ -263,7 +273,7 @@ async def execute_analysis_and_handle_result(pr_data: dict, structured_diff_text
     """Extract and return analysis components as prompts"""
     try:
         logger.info(f"Starting analysis for PR #{pr_data['pull_request_number']}")
-        results = execute_analysis(pr_data, structured_diff_text)
+        results = graph_workflow.execute_analysis(pr_data, structured_diff_text)
         print("\n\nIn execute_analysis_and_handle_result")
         print("dependency_analysis:\n")
         print(results.get("dependency_analysis"))

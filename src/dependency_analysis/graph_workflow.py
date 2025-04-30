@@ -5,8 +5,8 @@ import logging
 from typing import TypedDict
 from langgraph.graph import StateGraph, END
 from dotenv import load_dotenv
-from ai_agents import dependency_analyzer_agent_executor
-from tools import store_dependencies
+from .ai_agents import dependency_analyzer_agent_executor
+from .tools import store_dependencies
 
 load_dotenv()
 logger = logging.getLogger(__name__)

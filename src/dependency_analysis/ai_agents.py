@@ -4,7 +4,11 @@ import logging
 from langchain_openai import ChatOpenAI
 from langchain.agents import AgentExecutor, create_openai_functions_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from tools import retrieve_dependency_graphs, store_dependencies,get_file_content
+from .tools import retrieve_dependency_graphs, store_dependencies, get_file_content
+from dotenv import load_dotenv 
+
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
