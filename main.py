@@ -9,10 +9,8 @@ from llm_utils import final_review, line_numbers_handle
 from github_utils import create_check_run, update_check_run, parse_diff_file_line_numbers, build_review_prompt_with_file_line_numbers
 from authenticate_github import verify_signature, connect_repo
 from prTitle_analysis import analyze_pr_with_diff, update_faiss_store
-
 import logging
-
-from git_repo_mcp import stream_git_repo_query, QueryRequest
+from git_repo_mcp import stream_git_repo_query,current_session_id, session_histories, QueryRequest, EndSessionRequest
 
 # Configure the logger
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -191,34 +189,55 @@ def analyze_pr_summary(pr_title,code_diff):
 
     return feedback
 
+async def generator_with_session(session_id, repo_path, query):
+    token = current_session_id.set(session_id)
+    try:
+        async for chunk in stream_git_repo_query(session_id, repo_path, query):
+            yield chunk
+    finally:
+        current_session_id.reset(token)
+
 @app.post("/analyze")
 async def analyze_repository(request: QueryRequest):
     """
-    Endpoint to receive repository path and query, and stream back the analysis.
+    Endpoint to receive repository path, query, and session_id,
+    and stream back the analysis using conversation history.
     """
-    print(f"Received request: repo_path='{request.repo_path}', query='{request.query}'")
+    print(f"Received request: session_id='{request.session_id}', repo_path='{request.repo_path}', query='{request.query}'")
 
-    # Basic validation (FastAPI handles Pydantic validation)
+    # Basic validation
     if not os.path.isdir(request.repo_path):
-         # Check if it's a valid directory *before* starting the stream
          raise HTTPException(status_code=400, detail=f"Invalid repository path: {request.repo_path}")
     if not request.query:
         raise HTTPException(status_code=400, detail="Query cannot be empty.")
+    if not request.session_id:
+         raise HTTPException(status_code=400, detail="Session ID is required.")
 
-    # Return a StreamingResponse, passing the async generator
     return StreamingResponse(
-        stream_git_repo_query(request.repo_path, request.query),
-        media_type="text/plain" # Stream plain text deltas
+        generator_with_session(request.session_id, request.repo_path, request.query),
+        media_type="text/plain"
     )
 
-@app.get("/") # Simple root endpoint for testing
+@app.post("/end_session")
+async def end_session(request: EndSessionRequest):
+    """
+    Endpoint to remove a session's history from memory.
+    """
+    session_id = request.session_id
+    if session_id in session_histories:
+        del session_histories[session_id]
+        print(f"Session {session_id}: History deleted.")
+        return {"status": "success", "message": f"Session {session_id} ended."}
+    else:
+        print(f"Session {session_id}: Attempted to delete non-existent session.")
+        return {"status": "not_found", "message": f"Session {session_id} not found."}
+
+
+@app.get("/") 
 async def read_root():
     return {"message": "Git Analyzer FastAPI server is running. POST to /analyze"}
 
 
-# --- Server Execution (using uvicorn) ---
 if __name__ == "__main__":
     import uvicorn
-    # Run the server on localhost, port 8000
-    # You might want to make host/port configurable
     uvicorn.run(app, host="127.0.0.1", port=8000)
