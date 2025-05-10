@@ -10,10 +10,10 @@ from openai.types.responses import ResponseTextDeltaEvent
 from dotenv import load_dotenv
 
 
-# Global context variable that will hold the id *per request*
+# Global context variable that will hold the id per request
 current_session_id: contextvars.ContextVar[str] = contextvars.ContextVar("current_session_id")
 
-# Load environment variables (especially OPENAI_API_KEY)
+# Load environment variables 
 load_dotenv()
 if not os.getenv("OPENAI_API_KEY"):
     print("Warning: OPENAI_API_KEY environment variable not set.")
