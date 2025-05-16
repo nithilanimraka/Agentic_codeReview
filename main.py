@@ -1,9 +1,11 @@
 import os
 import json
 from fastapi import FastAPI, Request, Header,HTTPException, BackgroundTasks
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, PlainTextResponse, JSONResponse
 from dotenv import load_dotenv
+from pydantic import BaseModel
 import requests
+import asyncio
 import sys
 from contextlib import asynccontextmanager
 
@@ -47,6 +49,10 @@ async def lifespan(app: FastAPI):
     # Cleanup on shutdown remains the same
 
 app = FastAPI()
+
+class CodeReviewRequest(BaseModel):
+    """Pydantic model for the /code-review endpoint request body."""
+    diff_content: str
 
 check_run = None  # Initialize globally
 
@@ -127,7 +133,7 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
 
                 # Post each review item as a comment on the PR
                 for review in review_list:
-                    print("\n\n")
+                    print("\n\n========================")
                     print(review)
 
                     # Get the line numbers (int) for the review
@@ -289,6 +295,40 @@ async def execute_analysis_and_handle_result(pr_data: dict, structured_diff_text
     except Exception as e:
         logger.error(f"Background analysis failed: {str(e)}", exc_info=True)
         return None, None
+
+
+@app.post("/code-review")
+async def code_review_endpoint(review_request: CodeReviewRequest):
+    """
+    Receives diff content, runs the analysis pipeline, and returns the review list as JSON.
+    """
+    logger.info("Received request for /code-review")
+    try:
+        diff_content = review_request.diff_content
+        if not diff_content:
+            raise HTTPException(status_code=400, detail="diff_content cannot be empty.")
+
+        logger.info("Parsing diff content...")
+        parsed_files = parse_diff_file_line_numbers(diff_content)
+
+        logger.info("Building review prompt...")
+        structured_prompt = build_review_prompt_with_file_line_numbers(parsed_files)
+
+        logger.info("Generating final review...")
+        # Run the potentially long-running LLM call in a thread pool
+        review_list = await asyncio.to_thread(final_review, structured_prompt)
+        logger.info(f"Code review generated successfully with {len(review_list)} items.")
+
+        return JSONResponse(content=review_list)
+
+    except HTTPException as http_exc:
+        logger.error(f"HTTP error during code review: {http_exc.detail}")
+        raise http_exc
+    except Exception as e:
+        logger.error(f"Error during code review processing: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error during code review: {str(e)}")
+
+
 
 
 @app.post("/analyze")
