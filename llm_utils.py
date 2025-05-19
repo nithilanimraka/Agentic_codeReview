@@ -24,15 +24,15 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # if not groq_api_key:
 #     raise ValueError("GROQ_API_KEY is not set")
 
-openai_api_key = os.environ.get('OPENAI_API_KEY')
-if not openai_api_key:
-    raise ValueError("OPENAI_API_KEY is not set")
+google1_api_key = os.environ.get('GOOGLE_API_KEY')
+if not google1_api_key:
+    raise ValueError("GOOGLE_API_KEY is not set")
 
 gemini_api_key = os.environ.get('GEMINI_API_KEY')
 if not gemini_api_key:
     raise ValueError("GEMINI_API_KEY is not set")
 
-llm_groq = ChatGoogleGenerativeAI(
+llm_gemini = ChatGoogleGenerativeAI(
     model="gemini-2.0-flash",
     google_api_key=gemini_api_key,
     temperature=0,
@@ -41,8 +41,8 @@ llm_groq = ChatGoogleGenerativeAI(
     max_retries=2,
 )
 
-llm_openai = ChatOpenAI(model="gpt-4o-2024-08-06",
-                        api_key=openai_api_key,
+llm_fin_gemini = ChatGoogleGenerativeAI(model="gemini-2.0-flash",
+                        google_api_key=google1_api_key,
                          temperature=0)
 
 
@@ -63,7 +63,7 @@ class FinalReview(BaseModel):
 class FinalReviews(BaseModel):
     finalReviews: List[FinalReview] = Field(..., description="Final Reviews of Data of the Code.",)
 
-structured_openai_llm = llm_openai.with_structured_output(FinalReviews)
+structured_gemini_llm = llm_fin_gemini.with_structured_output(FinalReviews)
 
 
 # Schema for structured output to use in planning
@@ -87,7 +87,7 @@ class ReviewData(BaseModel):
 class ReviewDatas(BaseModel):
     reviewDatas: List[ReviewData] = Field(description="Reviews of Data of the Code.",)
 
-structured_llm = llm_groq.with_structured_output(ReviewDatas)
+structured_llm = llm_gemini.with_structured_output(ReviewDatas)
 
 def line_numbers_handle(start_line_with_prefix, end_line_with_prefix):
     value1 = start_line_with_prefix
@@ -347,7 +347,7 @@ def final_review(pr_data:str) -> List[Dict]:
     print(final_issues) # Print the aggregated issues before sending to OpenAI
     print("------------------------")
 
-    final_response= structured_openai_llm.invoke(final_prompt.format_messages(PR_data=pr_data, Issues=final_issues))
+    final_response= structured_gemini_llm.invoke(final_prompt.format_messages(PR_data=pr_data, Issues=final_issues))
 
     return [review.model_dump() for review in final_response.finalReviews]
 

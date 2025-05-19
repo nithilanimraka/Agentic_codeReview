@@ -128,7 +128,7 @@ async def stream_git_repo_query(session_id: str, directory_path: str, user_query
         # Format the system instructions with the specific directory path
         formatted_system_instructions = SYSTEM_INSTRUCTIONS.format(directory_path=directory_path)
 
-        # Use async context manager for MCPServerStdio
+        # Async context manager for MCPServerStdio
         async with MCPServerStdio(
             cache_tools_list=True,
             params={
