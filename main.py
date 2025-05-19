@@ -5,12 +5,12 @@ from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 import requests
 
-from llm_utils import final_review, line_numbers_handle
-from github_utils import create_check_run, update_check_run, parse_diff_file_line_numbers, build_review_prompt_with_file_line_numbers
-from authenticate_github import verify_signature, connect_repo
-from prTitle_analysis import analyze_pr_with_diff, update_faiss_store
+from src.code_review.llm_utils import final_review, line_numbers_handle
+from src.github_con.github_utils import create_check_run, update_check_run, parse_diff_file_line_numbers, build_review_prompt_with_file_line_numbers
+from src.github_con.authenticate_github import verify_signature, connect_repo
+from src.code_review.prTitle_analysis import analyze_pr_with_diff, update_faiss_store
 import logging
-from git_repo_mcp import stream_git_repo_query,current_session_id, session_histories, QueryRequest, EndSessionRequest
+from src.code_review.git_repo_mcp import stream_git_repo_query,current_session_id, session_histories, QueryRequest, EndSessionRequest
 
 # Configure the logger
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
