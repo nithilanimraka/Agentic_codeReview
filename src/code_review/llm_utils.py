@@ -8,12 +8,10 @@ from dotenv import load_dotenv
 from typing import TypedDict, List
 from langgraph.graph import StateGraph, START,END
 from langchain_core.prompts import ChatPromptTemplate
-# from langchain_groq import ChatGroq
-from langchain_openai import ChatOpenAI
 import re
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-import prompt_templates
+from src.code_review import prompt_templates
 
 
 load_dotenv()
