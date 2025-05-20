@@ -220,7 +220,7 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
 
                 # Fetch changed files
             try:
-                changed_files = tools.get_changed_files_from_pr(owner, repo_name, pr_number)
+                changed_files = tools.get_changed_files_from_pr(repo, pr_number)
                 logger.info(f"Found {len(changed_files)} changed files")
             except Exception as e:
                 logger.error(f"Failed to fetch changed files: {str(e)}")
