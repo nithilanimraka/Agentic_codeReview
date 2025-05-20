@@ -1,3 +1,4 @@
+# tools.py
 import os
 import json
 import requests
@@ -122,61 +123,48 @@ def store_dependencies(repository_id: str, dependencies: List[Dict], neo4j_uri: 
         raise
 
 @tool
-def get_file_content(repo_url: str, commit_sha: str, file_path: str) -> str:
-    """Retrieves full content of a file from GitHub repository."""
-    try:
-        owner, repo = get_github_owner_repo(repo_url)
-        if not owner or not repo:
-            raise ValueError("Invalid GitHub URL")
-
-        url = f"https://api.github.com/repos/{owner}/{repo}/contents/{file_path}?ref={commit_sha}"
-        headers = {
-            'Authorization': f'Bearer {os.getenv("GITHUB_TOKEN")}',
-            'Accept': 'application/vnd.github.v3.raw',
-            'X-GitHub-Api-Version': '2022-11-28'
-        }
-
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        return response.text
+def get_file_content(repo, file_path: str, commit_sha: str) -> str:
+    """Retrieves full content of a file using authenticated repo object.
+    
+    Args:
+        repo: Authenticated PyGithub Repository object
+        file_path: Path to file in repository
+        commit_sha: Commit SHA reference
         
+    Returns:
+        File content as string or error message
+    """
+    try:
+        # Get file content using PyGithub's built-in methods
+        file_content = repo.get_contents(file_path, ref=commit_sha)
+        if isinstance(file_content, list):  # Handle directories
+            raise ValueError(f"Path '{file_path}' is a directory, not a file")
+        return file_content.decoded_content.decode('utf-8')
     except Exception as e:
         logger.error(f"Failed to fetch file content: {str(e)}")
         return f"File content unavailable: {str(e)}"
 
-def get_changed_files_from_pr(owner: str, repo: str, pr_number: int) -> list[str]:
-    """Fetches the list of changed files for a given PR using GitHub API."""
-    logger.info(f"Fetching changed files for PR #{pr_number} in {owner}/{repo}")
-    github_token = os.getenv("GITHUB_TOKEN")
-    if not github_token:
-        raise ValueError("GITHUB_TOKEN not configured")
-
-    url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/files"
-    headers = {
-        'Authorization': f'Bearer {github_token}',
-        'Accept': 'application/vnd.github.v3+json',
-        'X-GitHub-Api-Version': '2022-11-28'
-    }
-
-    changed_files = []
-    page = 1
-    while True:
-        try:
-            response = requests.get(url, headers=headers, params={'page': page, 'per_page': 100}, timeout=20)
-            response.raise_for_status()
-            files = response.json()
-            if not files:
-                break
-            changed_files.extend([f['filename'] for f in files if f.get('filename')])
-            if 'next' not in response.links:
-                break
-            page += 1
-        except requests.exceptions.RequestException as e:
-            logger.error(f"GitHub API error: {str(e)}")
-            raise ValueError(f"Failed to fetch changed files: {str(e)}")
-
-    logger.info(f"Found {len(changed_files)} changed files")
-    return changed_files
+def get_changed_files_from_pr(repo, pr_number: int) -> list[str]:
+    """Fetches changed files list using authenticated repo object.
+    
+    Args:
+        repo: Authenticated PyGithub Repository object
+        pr_number: Pull request number
+        
+    Returns:
+        List of changed filenames
+    """
+    logger.info(f"Fetching changed files for PR #{pr_number}")
+    try:
+        pr = repo.get_pull(pr_number)
+        # Get up to 300 files (GitHub's max per_page)
+        files = pr.get_files()
+        changed_files = [f.filename for f in files]
+        logger.info(f"Found {len(changed_files)} changed files")
+        return changed_files
+    except Exception as e:
+        logger.error(f"Failed to fetch PR files: {str(e)}")
+        raise ValueError(f"PR file retrieval failed: {str(e)}")
 
 
 def close_neo4j_driver():
