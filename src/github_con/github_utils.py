@@ -1,7 +1,7 @@
 from unidiff import PatchSet
 from typing import List, Dict
 
-from llm_utils import line_numbers_handle
+from src.code_review.llm_utils import line_numbers_handle
 
 def create_check_run(repo, sha):
     """Create a check run using the modern PyGithub API"""
