@@ -116,8 +116,47 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
                 else:
                     logger.warning("No feedback was generated or analysis failed, skipping comment posting.")
 
+
+
+                # Get owner/repo
+                owner, repo_name = tools.get_github_owner_repo(repo_url)
+                if not owner or not repo_name:
+                    raise HTTPException(400, "Could not parse repository info")
+
+                logger.info(
+                    f"Processing PR #{pr_number} in {owner}/{repo_name} "
+                    f"(Action: {action}, Commit: {head_sha[:7]})"
+                )
+
+                    # Filter relevant actions
+                if action not in ["opened", "reopened", "synchronize"]:
+                    return {"status": "ignored", "reason": f"Action '{action}' not supported"}
+
+                    # Fetch changed files
+                try:
+                    changed_files = tools.get_changed_files_from_pr(repo, pr_number)
+                    logger.info(f"Found {len(changed_files)} changed files")
+                except Exception as e:
+                    logger.error(f"Failed to fetch changed files: {str(e)}")
+                    raise HTTPException(502, "Could not retrieve PR files")
+
                 # Analyze code changes (your existing function)
-                review_list = final_review(structured_diff_text)
+                pr_data = {
+                "repo_url": repo_url,
+                "commit_sha": head_sha,
+                "base_branch": base_branch,
+                "pull_request_number": pr_number,
+                "changed_files": changed_files,
+                "owner": owner,
+                "repo": repo_name
+                }
+
+                analysis_result = execute_analysis_and_handle_result(pr_data, structured_diff_text)
+                dependency_data = analysis_result.get("dependency_analysis", {})
+                review_list = final_review(
+                                structured_diff_text, 
+                                dependency_analysis=dependency_data
+                            )
 
                 print("After llm call ...")
                 
@@ -204,41 +243,8 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
                 raise
 
 
-            # Get owner/repo
-            owner, repo_name = tools.get_github_owner_repo(repo_url)
-            if not owner or not repo_name:
-                raise HTTPException(400, "Could not parse repository info")
-
-            logger.info(
-                f"Processing PR #{pr_number} in {owner}/{repo_name} "
-                f"(Action: {action}, Commit: {head_sha[:7]})"
-            )
-
-                # Filter relevant actions
-            if action not in ["opened", "reopened", "synchronize"]:
-                return {"status": "ignored", "reason": f"Action '{action}' not supported"}
-
-                # Fetch changed files
-            try:
-                changed_files = tools.get_changed_files_from_pr(repo, pr_number)
-                logger.info(f"Found {len(changed_files)} changed files")
-            except Exception as e:
-                logger.error(f"Failed to fetch changed files: {str(e)}")
-                raise HTTPException(502, "Could not retrieve PR files")
-
-            # Prepare analysis data
-            pr_data = {
-                "repo_url": repo_url,
-                "commit_sha": head_sha,
-                "base_branch": base_branch,
-                "pull_request_number": pr_number,
-                "changed_files": changed_files,
-                "owner": owner,
-                "repo": repo_name
-            }
-
             # Trigger analysis
-            background_tasks.add_task(execute_analysis_and_handle_result, pr_data, structured_diff_text)
+            # background_tasks.add_task(execute_analysis_and_handle_result, pr_data, structured_diff_text)
             return {
                 "status": "analysis_started",
                 "pr_number": pr_number,
@@ -271,26 +277,18 @@ def analyze_pr_summary(pr_title,code_diff):
     return feedback
 
 
-async def execute_analysis_and_handle_result(pr_data: dict, structured_diff_text: str):
-    """Extract and return analysis components as prompts"""
+def execute_analysis_and_handle_result(pr_data: dict, structured_diff_text: str) -> dict:
+    """Synchronous execution of analysis workflow"""
     try:
         logger.info(f"Starting analysis for PR #{pr_data['pull_request_number']}")
         results = graph_workflow.execute_analysis(pr_data, structured_diff_text)
-        print("\n\nIn execute_analysis_and_handle_result")
-        print("dependency_analysis:\n")
-        print(results.get("dependency_analysis"))
-        
-        if "error" in results:
-            logger.error(f"Analysis failed: {results['error']}")
-            return None, None
-        
         return {
-            "dependency_analysis": results.get("dependency_analysis")
+            "dependency_analysis": results.get("dependency_analysis"),
+            "error": results.get("error")
         }
-        
     except Exception as e:
-        logger.error(f"Background analysis failed: {str(e)}", exc_info=True)
-        return None, None
+        logger.error(f"Analysis failed: {str(e)}", exc_info=True)
+        return {"error": str(e)}
 
 
 @app.post("/code-review")
