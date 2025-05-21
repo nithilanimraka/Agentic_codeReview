@@ -66,7 +66,7 @@ You are an expert code reviewer **strictly focused on error handling and logging
 """
 error_prompt = ChatPromptTemplate.from_messages([
     ("system", error_system_message),
-    ("human", """Analyze the following code diff and dependencies, provide issues if exist:\nCode Diff:{PR_data}\nDependency Analysis:{dependency_analysis}"""),
+    ("human", """Analyze the following code diff and dependencies. note that the dependencies are given as supportive data, provide issues if exist:\nCode Diff:{PR_data}\nDependency Analysis:{dependency_analysis}"""),
 ])
 
 # --- Security Prompt ---
@@ -92,7 +92,7 @@ You are an expert code reviewer **strictly focused on security vulnerabilities**
 """
 security_prompt = ChatPromptTemplate.from_messages([
     ("system", security_system_message),
-    ("human", """Analyze the following code diff and dependencies, provide issues if exist:\nCode Diff:{PR_data}\nDependency Analysis:{dependency_analysis}"""),
+    ("human", """Analyze the following code diff and dependencies. note that the dependencies are given as supportive data, provide issues if exist:\nCode Diff:{PR_data}\nDependency Analysis:{dependency_analysis}"""),
 ])
 
 # --- Performance Prompt ---
@@ -117,7 +117,7 @@ You are an expert code reviewer **strictly focused on performance**.
 """
 performance_prompt = ChatPromptTemplate.from_messages([
     ("system", performance_system_message),
-    ("human", """Analyze the following code diff and dependencies, provide issues if exist:\nCode Diff:{PR_data}\nDependency Analysis:{dependency_analysis}"""),
+    ("human", """Analyze the following code diff and dependencies. note that the dependencies are given as supportive data, provide issues if exist:\nCode Diff:{PR_data}\nDependency Analysis:{dependency_analysis}"""),
 ])
 
 # --- Quality Prompt ---
@@ -143,7 +143,7 @@ You are an expert code reviewer **strictly focused on code quality, readability,
 """
 quality_prompt = ChatPromptTemplate.from_messages([
      ("system", quality_system_message),
-    ("human", """Analyze the following code diff and dependencies, provide issues if exist:\nCode Diff:{PR_data}\nDependency Analysis:{dependency_analysis}"""),
+    ("human", """Analyze the following code diff and dependencies. note that the dependencies are given as supportive data, provide issues if exist:\nCode Diff:{PR_data}\nDependency Analysis:{dependency_analysis}"""),
 ])
 
 # --- Other Prompt ---
@@ -166,5 +166,5 @@ You are an expert code reviewer specializing in aspects **NOT** covered by error
 """
 other_prompt = ChatPromptTemplate.from_messages([
     ("system", other_system_message),
-    ("human", """Analyze the following code diff and dependencies, provide issues if exist:\nCode Diff:{PR_data}\nDependency Analysis:{dependency_analysis}"""),
+    ("human", """Analyze the following code diff and dependencies. note that the dependencies are given as supportive data, provide issues if exist:\nCode Diff:{PR_data}\nDependency Analysis:{dependency_analysis}"""),
 ])
