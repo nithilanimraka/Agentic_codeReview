@@ -10,7 +10,7 @@ from src.github_con.github_utils import create_check_run, update_check_run, pars
 from src.github_con.authenticate_github import verify_signature, connect_repo
 from src.code_review.prTitle_analysis import analyze_pr_with_diff, update_faiss_store
 import logging
-from src.code_review.git_repo_mcp import stream_git_repo_query,current_session_id, session_histories, QueryRequest, EndSessionRequest
+# from src.code_review.git_repo_mcp import stream_git_repo_query,current_session_id, session_histories, QueryRequest, EndSessionRequest
 
 #for duplicate check
 from src.duplicate_check.duplication_analyzer import perform_duplication_analysis
@@ -223,51 +223,50 @@ def analyze_pr_summary(pr_title,code_diff):
     return feedback
 
 async def generator_with_session(session_id, repo_path, query):
-    token = current_session_id.set(session_id)
-    try:
-        async for chunk in stream_git_repo_query(session_id, repo_path, query):
-            yield chunk
-    finally:
-        current_session_id.reset(token)
+    # token = current_session_id.set(session_id)
+    # try:
+    #     async for chunk in stream_git_repo_query(session_id, repo_path, query):
+    #         yield chunk
+    # finally:
+    #     current_session_id.reset(token)
+ @app.post("/analyze")
+# async def analyze_repository(request: QueryRequest):
+#     """
+#     Endpoint to receive repository path, query, and session_id,
+#     and stream back the analysis using conversation history.
+#     """
+#     print(f"Received request: session_id='{request.session_id}', repo_path='{request.repo_path}', query='{request.query}'")
 
-@app.post("/analyze")
-async def analyze_repository(request: QueryRequest):
-    """
-    Endpoint to receive repository path, query, and session_id,
-    and stream back the analysis using conversation history.
-    """
-    print(f"Received request: session_id='{request.session_id}', repo_path='{request.repo_path}', query='{request.query}'")
+#     # Basic validation
+#     if not os.path.isdir(request.repo_path):
+#          raise HTTPException(status_code=400, detail=f"Invalid repository path: {request.repo_path}")
+#     if not request.query:
+#         raise HTTPException(status_code=400, detail="Query cannot be empty.")
+#     if not request.session_id:
+#          raise HTTPException(status_code=400, detail="Session ID is required.")
 
-    # Basic validation
-    if not os.path.isdir(request.repo_path):
-         raise HTTPException(status_code=400, detail=f"Invalid repository path: {request.repo_path}")
-    if not request.query:
-        raise HTTPException(status_code=400, detail="Query cannot be empty.")
-    if not request.session_id:
-         raise HTTPException(status_code=400, detail="Session ID is required.")
+#     return StreamingResponse(
+#         generator_with_session(request.session_id, request.repo_path, request.query),
+#         media_type="text/plain"
+#     )
 
-    return StreamingResponse(
-        generator_with_session(request.session_id, request.repo_path, request.query),
-        media_type="text/plain"
-    )
-
-@app.post("/end_session")
-async def end_session(request: EndSessionRequest):
-    """
-    Endpoint to remove a session's history from memory.
-    """
-    session_id = request.session_id
-    if session_id in session_histories:
-        del session_histories[session_id]
-        print(f"Session {session_id}: History deleted.")
-        return {"status": "success", "message": f"Session {session_id} ended."}
-    else:
-        print(f"Session {session_id}: Attempted to delete non-existent session.")
-        return {"status": "not_found", "message": f"Session {session_id} not found."}
+ @app.post("/end_session")
+# async def end_session(request: EndSessionRequest):
+#     """
+#     Endpoint to remove a session's history from memory.
+#     """
+#     session_id = request.session_id
+#     if session_id in session_histories:
+#         del session_histories[session_id]
+#         print(f"Session {session_id}: History deleted.")
+#         return {"status": "success", "message": f"Session {session_id} ended."}
+#     else:
+#         print(f"Session {session_id}: Attempted to delete non-existent session.")
+#         return {"status": "not_found", "message": f"Session {session_id} not found."}
 
 
-@app.get("/") 
-async def read_root():
+ @app.get("/") 
+ async def read_root():
     return {"message": "Git Analyzer FastAPI server is running. POST to /analyze"}
 
 
