@@ -5,10 +5,10 @@ current_script_dir = os.path.dirname(os.path.abspath(__file__))
 
 project_root = os.path.dirname(os.path.dirname(current_script_dir))
 
-# Add the project root to sys.path
-if project_root not in sys.path: # Avoid adding multiple times if already present
+
+if project_root not in sys.path: 
     sys.path.insert(0, project_root)
-# --- END REQUIRED PATH MODIFICATION ---
+
 
 print("Current working directory:", os.getcwd())
 print("sys.path at start:", sys.path)
@@ -47,9 +47,7 @@ def perform_duplication_analysis(owner: str, repo_name: str, head_sha: str, issu
     duplication_conclusion = "neutral"
     duplication_output_details = "No detailed duplication output."
     duplicate_results = []
-    
-    # Define the threshold for "near duplicates"
-    # This should be the same threshold passed to revised_pipeline
+
     analysis_threshold = 0.998 
 
     archive_url = f"https://api.github.com/repos/{owner}/{repo_name}/zipball/{head_sha}"
@@ -80,7 +78,7 @@ def perform_duplication_analysis(owner: str, repo_name: str, head_sha: str, issu
             duplicate_results = revised_pipeline(
                 codebase_path=code_root_within_temp,
                 languages=target_languages_for_duplication,
-                threshold=analysis_threshold # Use the defined threshold
+                threshold=analysis_threshold 
             )
             logger.info("Duplication detection pipeline completed.")
 
@@ -93,16 +91,14 @@ def perform_duplication_analysis(owner: str, repo_name: str, head_sha: str, issu
 
                 for pair_idx, pair in enumerate(duplicate_results):
                     similarity = pair['similarity']
-                    
-                    # Determine the message based on similarity
+
                     if similarity == 1.0:
                         message = "These two functions exhibit **exact code duplication**."
                         exact_duplicates_count += 1
-                    elif similarity >= analysis_threshold and similarity < 1.0: # Explicitly check for near duplicates below 1.0
+                    elif similarity >= analysis_threshold and similarity < 1.0: 
                         message = "We recommend reviewing for refactoring opportunities."
                         near_duplicates_count += 1
                     else:
-                        # This case should ideally not be hit if revised_pipeline filters by threshold
                         message = "Please review these functions for potential duplication."
 
                     duplication_output_details += (
