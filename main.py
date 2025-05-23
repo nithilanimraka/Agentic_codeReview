@@ -153,15 +153,11 @@ async def webhook(request: Request, x_hub_signature: str = Header(None)):
                 # --- Perform code duplication analysis using the new function ---
                 duplication_summary_message, duplication_conclusion, duplication_output_details, duplicate_results = \
                     perform_duplication_analysis(owner, repo_name, head_sha, issue)
-                # --- End of duplication analysis -
 
-                
-                # Final update to the check run, combining all information
                 final_summary = (
                     f"LLM diff review comments posted.\n"
                     f"{duplication_summary_message}"
                 )
-                # The 'text' field for check run can be more detailed
                 final_text_output = (
                     "Detailed LLM review comments have been posted on the pull request.\n\n"
                     + (duplication_output_details if duplicate_results else "No detailed duplication output.")
@@ -182,7 +178,6 @@ async def webhook(request: Request, x_hub_signature: str = Header(None)):
 
                     
             except Exception as e:
-                # Only update check run if it was successfully created
                 if check_run is not None:
                     check_run.edit(
                         status="completed",
@@ -193,7 +188,6 @@ async def webhook(request: Request, x_hub_signature: str = Header(None)):
                         }
                     )
                 else:
-                    # Fallback error handling
                     print(f"Critical failure before check run creation: {str(e)}")
                     
                 raise
