@@ -28,7 +28,7 @@ WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 GITHUB_REPO = os.getenv("GITHUB_REPO")
 REPO_OWNER = os.getenv("REPO_OWNER")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-MAX_TOKENS_PER_CHUNK =500
+MAX_TOKENS_PER_CHUNK =80000
 
 # Tree-sitter configuration
 TREE_SITTER_LIB = 'build/my-languages.so'
