@@ -14,7 +14,6 @@ print("Current working directory:", os.getcwd())
 print("sys.path at start:", sys.path)
 
 
-import os
 import tempfile
 import zipfile
 import io

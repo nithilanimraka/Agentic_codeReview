@@ -14,11 +14,13 @@ from torch_geometric.nn import global_max_pool
 from torch.nn import GRU     
 from torch_geometric.data import Data, Batch
 from sklearn.metrics.pairwise import cosine_similarity
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
 
-
-
-hf_token  = "***REMOVED***"
+# Now, retrieve the token from the environment
+HF_TOKEN = os.getenv("HF_TOKEN")
 
 GLOBAL_NODE_TYPES = sorted(list(set([
     # Common types from before
@@ -226,8 +228,8 @@ def refine_ast(node, code):
     return new_node
 
 # Load model directly
-tokenizer = AutoTokenizer.from_pretrained('Salesforce/codet5p-110m-embedding' , token=hf_token)
-model = AutoModel.from_pretrained('Salesforce/codet5p-110m-embedding' , token=hf_token , trust_remote_code=True)
+tokenizer = AutoTokenizer.from_pretrained('Salesforce/codet5p-110m-embedding' , token=HF_TOKEN)
+model = AutoModel.from_pretrained('Salesforce/codet5p-110m-embedding' , token=HF_TOKEN, trust_remote_code=True)
 content_model = model
 
 
@@ -778,8 +780,8 @@ def revised_pipeline(codebase_path, languages=['python', 'java'], threshold=0.85
     """Revised pipeline integrating corrections"""
 
     try:
-        tokenizer = AutoTokenizer.from_pretrained('Salesforce/codet5p-110m-embedding', token=hf_token)
-        model = AutoModel.from_pretrained('Salesforce/codet5p-110m-embedding', token=hf_token, trust_remote_code=True)
+        tokenizer = AutoTokenizer.from_pretrained('Salesforce/codet5p-110m-embedding', token=HF_TOKEN)
+        model = AutoModel.from_pretrained('Salesforce/codet5p-110m-embedding', token=HF_TOKEN, trust_remote_code=True)
         content_model = model
 
         config = content_model.config
@@ -872,33 +874,4 @@ def revised_pipeline(codebase_path, languages=['python', 'java'], threshold=0.85
     print(f"Found {len(results)} duplicate pairs.")
     return results
 
-# #Main execution block 
-# if __name__ == "__main__":
-
-#     hf_token = hf_token 
-#     your_codebase_directory = r"D:\Code Review project L2\test_files" # CHANGE THIS
-
-#     target_languages = ['python', 'java'] 
-
-#     # DEFINE the similarity threshold for duplicates
-#     similarity_threshold = 0.998 
-
-#     print("Starting duplicate detection pipeline...")
-#     duplicate_results = revised_pipeline(
-#         codebase_path=your_codebase_directory,
-#         languages=target_languages,
-#         threshold=similarity_threshold
-#     )
-
-#     print("\n--- Duplicate Detection Results ---")
-#     if duplicate_results:
-#         for idx, pair in enumerate(duplicate_results):
-#             print(f"\nPair {idx+1}:")
-#             print(f"  Function 1: {pair['function1']} (File: {pair['file1']})")
-#             print(f"  Function 2: {pair['function2']} (File: {pair['file2']})")
-#             print(f"  Similarity: {pair['similarity']:.4f}")
-#     else:
-#         print("No duplicate pairs found or an error occurred.")
-
-#     print("\nPipeline finished.")
 
