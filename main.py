@@ -11,7 +11,7 @@ from src.github_con.authenticate_github import verify_signature, connect_repo
 from src.code_review.prTitle_analysis import analyze_pr_with_diff, update_faiss_store
 import logging
 from src.code_review.git_repo_mcp import stream_git_repo_query,current_session_id, session_histories, QueryRequest, EndSessionRequest
-
+from src.summarize_large_diff.summarization import count_tokens,analyze_pr
 # Configure the logger
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -52,68 +52,113 @@ async def webhook(request: Request, x_hub_signature: str = Header(None)):
                 #Get diff
                 diff_url = pull_request.diff_url
                 response = requests.get(diff_url)
+                diff_text = response.text
 
-                # Parse the diff to extract actual file line numbers.
-                parsed_files = parse_diff_file_line_numbers(response.text)
-    
-                # Build a structured diff text for the prompt.
-                structured_diff_text = build_review_prompt_with_file_line_numbers(parsed_files)
-                print(structured_diff_text)
+                token_count = count_tokens(diff_text)
+                MAX_TOKENS_PER_CHUNK=960000
 
-                print("Before llm call...")
-
-                issue = repo.get_issue(number=pr_number)
-                issue.create_comment(
-                    "Hi, I am a code reviewer bot. I will analyze the PR and provide detailed review comments."
-                )
-
-                feedback_pr= analyze_pr_summary(pr_title,response.text)
-                
-                if feedback_pr: # Only post if feedback was successfully generated
+                if token_count > MAX_TOKENS_PER_CHUNK:
+                    # Handle large diff by calling analyze_chunks endpoint
+                    logger.info(f"Diff too large ({token_count} tokens), using chunked analysis")
+                    
+                    # Post initial comment
+                    issue = repo.get_issue(number=pr_number)
+                    issue.create_comment(
+                        "Hi, I'm analyzing this large PR. This might take a few moments..."
+                    )
+                    
+                    # Call analyze_chunks endpoint
+                    analysis_comment = analyze_pr(pr_title,diff_text)
+                    
+                    # Post the final analysis
+                    issue.create_comment(analysis_comment)
+                    
                     try:
-                        posted_comment = issue.create_comment(body=feedback_pr)
-                        logger.info(f"Successfully posted feedback comment: {posted_comment.html_url}")
+                      check_run.edit(
+                        status='completed',
+                        conclusion='neutral',
+                        output={
+                          'title': 'Large PR Detected',
+                         'summary': 'Analysis performed via comments only'
+                      }
+                         )
                     except Exception as e:
-                        logger.error(f"An unexpected error occurred posting feedback: {str(e)}", exc_info=True)
+                        logger.warning(f"Check run completion failed: {str(e)}")
+                    
+                    # update_check_run(
+                    #     check_run=check_run,
+                    #     results=[{
+                    #         "fileName": "Multiple files",
+                    #         "issue": "Large PR analyzed in chunks",
+                    #         "severity": "info",
+                    #         "suggestion": "See GitHub comments for detailed analysis",
+                    #         # "start_line_with_prefix": "",
+                    #         # "end_line_with_prefix": ""
+                    #     }]
+                    # )
                 else:
-                    logger.warning("No feedback was generated or analysis failed, skipping comment posting.")
 
-                # Analyze code changes (your existing function)
-                review_list = final_review(structured_diff_text)
+                     # Parse the diff to extract actual file line numbers.
+                     parsed_files = parse_diff_file_line_numbers(response.text)
+    
+                     # Build a structured diff text for the prompt.
+                     structured_diff_text = build_review_prompt_with_file_line_numbers(parsed_files)
+                     print(structured_diff_text)
 
-                print("After llm call ...")
+                     print("Before llm call...")
+
+                     issue = repo.get_issue(number=pr_number)
+                     issue.create_comment(
+                       "Hi, I am a code reviewer bot. I will analyze the PR and provide detailed review comments."
+                     )
+
+                     feedback_pr= analyze_pr_summary(pr_title,response.text)
                 
-                # Update check run with results
-                update_check_run(
-                    check_run=check_run,
-                    results=review_list
-                )
+                     if feedback_pr: # Only post if feedback was successfully generated
+                         try:
+                             posted_comment = issue.create_comment(body=feedback_pr)
+                             logger.info(f"Successfully posted feedback comment: {posted_comment.html_url}")
+                         except Exception as e:
+                             logger.error(f"An unexpected error occurred posting feedback: {str(e)}", exc_info=True)
+                     else:
+                         logger.warning("No feedback was generated or analysis failed, skipping comment posting.")
 
-                # Post each review item as a comment on the PR
-                for review in review_list:
-                    print("\n\n")
-                    print(review)
+                     # Analyze code changes (your existing function)
+                     review_list = final_review(structured_diff_text)
+
+                     print("After llm call ...")
+                
+                    # Update check run with results
+                     update_check_run(
+                      check_run=check_run,
+                      results=review_list
+                     )
+
+                     # Post each review item as a comment on the PR
+                     for review in review_list:
+                       print("\n\n")
+                       print(review)
 
                     # Get the line numbers (int) for the review
-                    start_line, end_line = line_numbers_handle(review['start_line_with_prefix'], review['end_line_with_prefix'])
+                     start_line, end_line = line_numbers_handle(review['start_line_with_prefix'], review['end_line_with_prefix'])
 
 
-                    prog_lang = review.get('language', '')  # Default to an empty string if 'language' is missing
-                    comment_body = (
+                     prog_lang = review.get('language', '')  # Default to an empty string if 'language' is missing
+                     comment_body = (
                         f"**Issue:** {review['issue']}\n\n"
                         f"**Severity:** {review['severity']}\n\n"
                         f"**Suggestion:** {review['suggestion']}\n"
                     )
                     
                     # If suggestedCode exists, add it to the comment
-                    if review.get("suggestedCode"):
+                     if review.get("suggestedCode"):
                         comment_body += f"```{prog_lang}\n{review['suggestedCode']}\n```"
 
                     #Check whether the start_line and end_line are from new file or old file
-                    start_line_side = "LEFT" if review['start_line_with_prefix'][0] == '-' else "RIGHT"
-                    end_line_side = "LEFT" if review['end_line_with_prefix'][0] == '-' else "RIGHT"
+                     start_line_side = "LEFT" if review['start_line_with_prefix'][0] == '-' else "RIGHT"
+                     end_line_side = "LEFT" if review['end_line_with_prefix'][0] == '-' else "RIGHT"
 
-                    if(start_line != end_line):
+                     if(start_line != end_line):
                         try:
                             pull_request.create_review_comment(
                             body=comment_body,
@@ -131,7 +176,7 @@ async def webhook(request: Request, x_hub_signature: str = Header(None)):
                             else:
                                 print("No valid comments to post")
 
-                    else:
+                     else:
                         try:
                             pull_request.create_review_comment(
                             body=comment_body,
