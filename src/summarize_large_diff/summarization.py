@@ -14,6 +14,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 import tiktoken
 import google.generativeai as genai
 from tree_sitter import Language, Parser
+from pathlib import Path
 
 # Load environment variables
 load_dotenv()
@@ -23,15 +24,24 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 GITHUB_REPO = os.getenv("GITHUB_REPO")
 REPO_OWNER = os.getenv("REPO_OWNER")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-MAX_TOKENS_PER_CHUNK =80000
+MAX_TOKENS_PER_CHUNK = 960000
 
 # Tree-sitter configuration
-TREE_SITTER_LIB = 'build/my-languages.so'
+TREE_SITTER_LIB = str(Path(__file__).parent / 'build' / 'my-languages.so')
+
+
+# Add verification
+if not os.path.exists(TREE_SITTER_LIB):
+    logger.error(f"Tree-sitter library not found at {TREE_SITTER_LIB}")
+    USE_TREE_SITTER = False
+else:
+    USE_TREE_SITTER = True
+    logger.info(f"Found Tree-sitter library at {TREE_SITTER_LIB}")
 
 # Language mapping
 LANGUAGE_MAP = {
@@ -58,9 +68,20 @@ genai.configure(api_key=GOOGLE_API_KEY)
 
 # --- Helper Functions ---
 
-def count_tokens(text, model_name="gpt-3.5-turbo"):
-    encoding = tiktoken.encoding_for_model(model_name)
-    return len(encoding.encode(text))
+def count_tokens(text: str, model_name: str = "gemini-1.5-flash") -> int:
+    """
+    Estimate token count for Gemini and GPT models.
+    Uses tiktoken for GPT, and a 3.5 chars/token approximation for Gemini.
+    """
+    if model_name.startswith("gpt-"):
+        import tiktoken
+        encoding = tiktoken.encoding_for_model(model_name)
+        return len(encoding.encode(text))
+    elif model_name.startswith("gemini"):
+        # Gemini models (1.5 Flash, 1.5 Pro, 2.0 etc.) use approx. 3.5 chars/token
+        return int(len(text) / 3.5)
+    else:
+        raise ValueError(f"Unsupported model: {model_name}")
 
 def get_language_by_extension(filename):
     for ext, lang in LANGUAGE_MAP.items():
@@ -182,11 +203,13 @@ def summarize_chunk(chunk):
         logger.error(f"Error summarizing chunk: {str(e)}")
         return "Summary error"
 
-def generate_final_summary(chunk_summaries, pr_diff):
+def generate_final_summary(pr_title, chunk_summaries, pr_diff):
     model = ChatGoogleGenerativeAI(model="models/gemini-2.0-flash", temperature=0.3)
     
     prompt_template = """
 **🔍 Comprehensive PR Analysis Report**
+
+**PR Title:** {title}
 
 **📝 Code Changes Summary:**
 {summaries}
@@ -210,6 +233,7 @@ def generate_final_summary(chunk_summaries, pr_diff):
     
     prompt = ChatPromptTemplate.from_template(prompt_template)
     formatted_input = prompt.format(
+        title=pr_title,
         summaries="\n\n".join(chunk_summaries),
         diff_preview=diff_preview
     )
@@ -219,36 +243,36 @@ def generate_final_summary(chunk_summaries, pr_diff):
 
 # --- Core PR Analysis Functions ---
 
-async def verify_signature(request: Request):
-    """Verify the GitHub webhook signature."""
-    signature = request.headers.get("X-Hub-Signature-256")
-    if not WEBHOOK_SECRET:
-        raise HTTPException(status_code=500, detail="WEBHOOK_SECRET is not set.")
-    if not signature:
-        raise HTTPException(status_code=403, detail="No GitHub signature provided.")
+# async def verify_signature(request: Request):
+#     """Verify the GitHub webhook signature."""
+#     signature = request.headers.get("X-Hub-Signature-256")
+#     if not WEBHOOK_SECRET:
+#         raise HTTPException(status_code=500, detail="WEBHOOK_SECRET is not set.")
+#     if not signature:
+#         raise HTTPException(status_code=403, detail="No GitHub signature provided.")
     
-    payload_body = await request.body()
-    computed_signature = "sha256=" + hmac.new(
-        WEBHOOK_SECRET.encode(), payload_body, hashlib.sha256
-    ).hexdigest()
+#     payload_body = await request.body()
+#     computed_signature = "sha256=" + hmac.new(
+#         WEBHOOK_SECRET.encode(), payload_body, hashlib.sha256
+#     ).hexdigest()
     
-    if not hmac.compare_digest(computed_signature, signature):
-        raise HTTPException(status_code=403, detail="Invalid signature")
+#     if not hmac.compare_digest(computed_signature, signature):
+#         raise HTTPException(status_code=403, detail="Invalid signature")
 
-def fetch_pr_diff(diff_url):
-    """Fetch the diff for a PR from GitHub."""
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-    try:
-        diff_response = requests.get(diff_url, headers=headers)
-        if diff_response.status_code == 403 and "rate limit exceeded" in diff_response.text.lower():
-            raise HTTPException(status_code=429, detail="GitHub API rate limit exceeded.")
-        diff_response.raise_for_status()
-        return diff_response.text
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error fetching PR diff: {e}")
-        return ""
+# def fetch_pr_diff(diff_url):
+#     """Fetch the diff for a PR from GitHub."""
+#     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+#     try:
+#         diff_response = requests.get(diff_url, headers=headers)
+#         if diff_response.status_code == 403 and "rate limit exceeded" in diff_response.text.lower():
+#             raise HTTPException(status_code=429, detail="GitHub API rate limit exceeded.")
+#         diff_response.raise_for_status()
+#         return diff_response.text
+#     except requests.exceptions.RequestException as e:
+#         logger.error(f"Error fetching PR diff: {e}")
+#         return ""
 
-def analyze_pr(pr_diff):
+def analyze_pr(pr_title, pr_diff):
     """Main function to analyze PR with chunking and summarization."""
     # Step 1: Chunk the diff
     chunks = chunk_diff_by_blocks(pr_diff)
@@ -263,12 +287,11 @@ def analyze_pr(pr_diff):
     combined_chunks = "\n\n".join(chunk_contents)
     
     # Step 3: Generate final comprehensive summary only
-    final_summary = generate_final_summary([combined_chunks], pr_diff)
-
+    final_summary = generate_final_summary(pr_title, [combined_chunks], pr_diff)
     
     # Simplified comment with only final review
     full_comment = f"""
-## 🚀 PR Analysis Report:
+## 🚀 PR Analysis Report: {pr_title}
 
 ### 📌 Comprehensive Review
 {final_summary}
@@ -282,36 +305,37 @@ The changes have been analyzed in their entirety, focusing on:
 """
     return full_comment
 
-
-@app.post("/analyze_chunks")
-async def analyze_pr_request(request: Request):
-    await verify_signature(request)
-    data = await request.json()
+# @app.post("/analyze_chunks")
+# async def analyze_pr_request(request: Request):
+#     """Endpoint to analyze a GitHub PR."""
+#     await verify_signature(request)
+#     data = await request.json()
     
-    if "pull_request" not in data:
-        return {"message": "Not a PR event"}
-
-    pr = data.get("pull_request", {})
-    diff_url = pr.get("diff_url")
+#     if "pull_request" not in data:
+#         return {"message": "Not a PR event"}
     
-    if not diff_url:
-        raise HTTPException(status_code=400, detail="Diff URL not found in PR data.")
+#     pr = data.get("pull_request", {})
+#     pr_title = pr.get("title", "No title provided.")
+#     diff_url = pr.get("diff_url")
     
-    pr_diff = fetch_pr_diff(diff_url)
-    analysis_comment = analyze_pr(pr_diff)
+#     if not diff_url:
+#         raise HTTPException(status_code=400, detail="Diff URL not found in PR data.")
     
-    comments_url = pr.get("comments_url")
-    if not comments_url:
-        raise HTTPException(status_code=400, detail="Comments URL not found in PR data.")
+#     pr_diff = fetch_pr_diff(diff_url)
+#     analysis_comment = analyze_pr(pr_title, pr_diff)
     
-    comment_payload = {"body": analysis_comment}
-    comment_response = requests.post(
-        comments_url,
-        headers={"Authorization": f"token {GITHUB_TOKEN}"},
-        json=comment_payload
-    )
+#     comments_url = pr.get("comments_url")
+#     if not comments_url:
+#         raise HTTPException(status_code=400, detail="Comments URL not found in PR data.")
     
-    if comment_response.status_code == 201:
-        return {"message": "Feedback posted successfully"}
-    else:
-        raise HTTPException(status_code=500, detail="Failed to post feedback")
+#     comment_payload = {"body": analysis_comment}
+#     comment_response = requests.post(
+#         comments_url,
+#         headers={"Authorization": f"token {GITHUB_TOKEN}"},
+#         json=comment_payload
+#     )
+    
+#     if comment_response.status_code == 201:
+#         return {"message": "Feedback posted successfully"}
+#     else:
+#         raise HTTPException(status_code=500, detail="Failed to post feedback")
