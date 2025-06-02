@@ -1,6 +1,7 @@
 import os
 import logging
 from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.agents import AgentExecutor, create_openai_functions_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from .tools import retrieve_dependency_graphs, store_dependencies, get_file_content
@@ -12,11 +13,11 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 # Initialize LLM
-llm = ChatOpenAI(
-    model="gpt-4o",
+llm = ChatGoogleGenerativeAI(
+    model="gemini-2.0-flash",
     temperature=0,
-    max_retries=3,
-    request_timeout=30
+    google_api_key=os.getenv("GOOGLE_API_KEY"),
+
 )
 
 
