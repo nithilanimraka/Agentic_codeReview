@@ -1,9 +1,13 @@
 import os
 import json
-from fastapi import FastAPI, Request, Header,HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, Request, Header,HTTPException, BackgroundTasks
+from fastapi.responses import StreamingResponse, PlainTextResponse, JSONResponse
 from dotenv import load_dotenv
+from pydantic import BaseModel
 import requests
+import asyncio
+import sys
+from contextlib import asynccontextmanager
 
 from src.code_review.llm_utils import final_review, line_numbers_handle
 from src.github_con.github_utils import create_check_run, update_check_run, parse_diff_file_line_numbers, build_review_prompt_with_file_line_numbers
@@ -12,17 +16,44 @@ from src.code_review.prTitle_analysis import analyze_pr_with_diff, update_faiss_
 import logging
 from src.code_review.git_repo_mcp import stream_git_repo_query,current_session_id, session_histories, QueryRequest, EndSessionRequest
 
+
+from src.dependency_analysis import ai_agents
+from src.dependency_analysis import graph_workflow
+from src.dependency_analysis import tools
+
+load_dotenv()
+
+
+
+tools.get_github_owner_repo
+tools.close_neo4j_driver
+tools.get_changed_files_from_pr
+tools.initialize_neo4j_schema
+graph_workflow.execute_analysis
+
+
 # Configure the logger
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize Neo4j schema on startup
+    tools.initialize_neo4j_schema()
+    yield
+    # Cleanup on shutdown remains the same
+
 app = FastAPI()
-load_dotenv()
+
+class CodeReviewRequest(BaseModel):
+    """Pydantic model for the /code-review endpoint request body."""
+    diff_content: str
 
 check_run = None  # Initialize globally
 
 @app.post("/webhook")
-async def webhook(request: Request, x_hub_signature: str = Header(None)):
+async def webhook(request: Request, x_hub_signature: str = Header(None), background_tasks: BackgroundTasks = BackgroundTasks):
     payload = await request.body()
     verify_signature(payload, x_hub_signature)
     payload_dict = json.loads(payload)
@@ -31,11 +62,18 @@ async def webhook(request: Request, x_hub_signature: str = Header(None)):
         owner = payload_dict["repository"]["owner"]["login"]
         repo_name = payload_dict["repository"]["name"]
         repo = connect_repo(owner, repo_name)
-        
+        pr = payload_dict.get("pull_request", {})
+        rp = payload_dict.get("repository", {})
+
+
         # Check if it's a pull_request event with action 'opened'
         if payload_dict.get("pull_request") and payload_dict.get("action") == "opened":
             pr_number = payload_dict["pull_request"]["number"]
             head_sha = payload_dict['pull_request']['head']['sha']
+            action = payload_dict.get("action")
+            base_branch = pr["base"]["ref"]
+            repo_url = rp["html_url"]
+        
 
             try:
                 # Create initial check run
@@ -78,8 +116,47 @@ async def webhook(request: Request, x_hub_signature: str = Header(None)):
                 else:
                     logger.warning("No feedback was generated or analysis failed, skipping comment posting.")
 
+
+
+                # Get owner/repo
+                owner, repo_name = tools.get_github_owner_repo(repo_url)
+                if not owner or not repo_name:
+                    raise HTTPException(400, "Could not parse repository info")
+
+                logger.info(
+                    f"Processing PR #{pr_number} in {owner}/{repo_name} "
+                    f"(Action: {action}, Commit: {head_sha[:7]})"
+                )
+
+                    # Filter relevant actions
+                if action not in ["opened", "reopened", "synchronize"]:
+                    return {"status": "ignored", "reason": f"Action '{action}' not supported"}
+
+                    # Fetch changed files
+                try:
+                    changed_files = tools.get_changed_files_from_pr(repo, pr_number)
+                    logger.info(f"Found {len(changed_files)} changed files")
+                except Exception as e:
+                    logger.error(f"Failed to fetch changed files: {str(e)}")
+                    raise HTTPException(502, "Could not retrieve PR files")
+
                 # Analyze code changes (your existing function)
-                review_list = final_review(structured_diff_text)
+                pr_data = {
+                "repo_url": repo_url,
+                "commit_sha": head_sha,
+                "base_branch": base_branch,
+                "pull_request_number": pr_number,
+                "changed_files": changed_files,
+                "owner": owner,
+                "repo": repo_name
+                }
+
+                analysis_result = execute_analysis_and_handle_result(pr_data, structured_diff_text)
+                dependency_data = analysis_result.get("dependency_analysis", {})
+                review_list = final_review(
+                                structured_diff_text, 
+                                dependency_analysis=dependency_data
+                            )
 
                 print("After llm call ...")
                 
@@ -91,7 +168,7 @@ async def webhook(request: Request, x_hub_signature: str = Header(None)):
 
                 # Post each review item as a comment on the PR
                 for review in review_list:
-                    print("\n\n")
+                    print("\n\n========================")
                     print(review)
 
                     # Get the line numbers (int) for the review
@@ -165,6 +242,16 @@ async def webhook(request: Request, x_hub_signature: str = Header(None)):
                     
                 raise
 
+
+            # Trigger analysis
+            # background_tasks.add_task(execute_analysis_and_handle_result, pr_data, structured_diff_text)
+            return {
+                "status": "analysis_started",
+                "pr_number": pr_number,
+                "repo": f"{owner}/{repo_name}"
+            }
+
+
             
     return {}
 
@@ -188,6 +275,55 @@ def analyze_pr_summary(pr_title,code_diff):
             check_run.edit(status="completed", conclusion="failure", output={"title": "Analysis Error", "summary": f"Unexpected error during analysis: {str(analysis_err)}"})
 
     return feedback
+
+
+def execute_analysis_and_handle_result(pr_data: dict, structured_diff_text: str) -> dict:
+    """Synchronous execution of analysis workflow"""
+    try:
+        logger.info(f"Starting analysis for PR #{pr_data['pull_request_number']}")
+        results = graph_workflow.execute_analysis(pr_data, structured_diff_text)
+        return {
+            "dependency_analysis": results.get("dependency_analysis"),
+            "error": results.get("error")
+        }
+    except Exception as e:
+        logger.error(f"Analysis failed: {str(e)}", exc_info=True)
+        return {"error": str(e)}
+
+
+@app.post("/code-review")
+async def code_review_endpoint(review_request: CodeReviewRequest):
+    """
+    Receives diff content, runs the analysis pipeline, and returns the review list as JSON.
+    """
+    logger.info("Received request for /code-review")
+    try:
+        diff_content = review_request.diff_content
+        if not diff_content:
+            raise HTTPException(status_code=400, detail="diff_content cannot be empty.")
+
+        logger.info("Parsing diff content...")
+        parsed_files = parse_diff_file_line_numbers(diff_content)
+
+        logger.info("Building review prompt...")
+        structured_prompt = build_review_prompt_with_file_line_numbers(parsed_files)
+
+        logger.info("Generating final review...")
+        # Run the potentially long-running LLM call in a thread pool
+        review_list = await asyncio.to_thread(final_review, structured_prompt)
+        logger.info(f"Code review generated successfully with {len(review_list)} items.")
+
+        return JSONResponse(content=review_list)
+
+    except HTTPException as http_exc:
+        logger.error(f"HTTP error during code review: {http_exc.detail}")
+        raise http_exc
+    except Exception as e:
+        logger.error(f"Error during code review processing: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Internal server error during code review: {str(e)}")
+
+
+
 
 async def generator_with_session(session_id, repo_path, query):
     token = current_session_id.set(session_id)
