@@ -113,7 +113,7 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
                     try:
                       check_run.edit(
                         status='completed',
-                        conclusion='neutral',
+                        conclusion='success',
                         output={
                           'title': 'Large PR Detected',
                          'summary': 'Analysis performed via comments only'
@@ -122,17 +122,6 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
                     except Exception as e:
                         logger.warning(f"Check run completion failed: {str(e)}")
                     
-                    # update_check_run(
-                    #     check_run=check_run,
-                    #     results=[{
-                    #         "fileName": "Multiple files",
-                    #         "issue": "Large PR analyzed in chunks",
-                    #         "severity": "info",
-                    #         "suggestion": "See GitHub comments for detailed analysis",
-                    #         # "start_line_with_prefix": "",
-                    #         # "end_line_with_prefix": ""
-                    #     }]
-                    # )
                 else:
 
                     # Parse the diff to extract actual file line numbers.
