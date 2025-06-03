@@ -16,8 +16,10 @@ logger = logging.getLogger(__name__)
 llm = ChatGoogleGenerativeAI(
     model="gemini-2.0-flash",
     temperature=0,
-    google_api_key=os.getenv("GOOGLE_API_KEY"),
-
+    google_api_key=os.getenv("NITHILA_GOOGLE_API_KEY"),
+    max_tokens=None,
+    timeout=None,
+    max_retries=2,
 )
 
 

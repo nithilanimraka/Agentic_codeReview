@@ -23,13 +23,26 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # if not groq_api_key:
 #     raise ValueError("GROQ_API_KEY is not set")
 
-google1_api_key = os.environ.get('GOOGLE_API_KEY')
+google1_api_key = os.environ.get('GEMINI_API_REVIEW_KEY')
 if not google1_api_key:
     raise ValueError("GOOGLE_API_KEY is not set")
 
 gemini_api_key = os.environ.get('GEMINI_API_KEY')
 if not gemini_api_key:
     raise ValueError("GEMINI_API_KEY is not set")
+
+
+gemini_api_key2 = os.environ.get('GOOGLE_API_KEY')
+if not gemini_api_key:
+    raise ValueError("GEMINI_API_KEY is not set")
+
+nithila_api_key = os.environ.get('NITHILA_GOOGLE_API_KEY')
+if not nithila_api_key:
+    raise ValueError("NITHILA_API_KEY is not set")
+
+randinu_api_key = os.environ.get('RANDINU_GOOGLE_API_KEY')
+if not randinu_api_key:
+    raise ValueError("RANDINU_API_KEY is not set")
 
 llm_gemini = ChatGoogleGenerativeAI(
     model="gemini-2.0-flash",
@@ -39,10 +52,41 @@ llm_gemini = ChatGoogleGenerativeAI(
     timeout=None,
     max_retries=2,
 )
+llm_gemini2 = ChatGoogleGenerativeAI(
+    model="gemini-2.0-flash",
+    google_api_key=gemini_api_key2,
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=2,
+)
 
-llm_fin_gemini = ChatGoogleGenerativeAI(model="gemini-2.0-flash",
-                        google_api_key=google1_api_key,
-                         temperature=0)
+llm_nithila = ChatGoogleGenerativeAI(
+    model="gemini-2.0-flash",
+    google_api_key=nithila_api_key,
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=2,
+)
+
+llm_randinu = ChatGoogleGenerativeAI(
+    model="gemini-2.0-flash",
+    google_api_key=randinu_api_key,
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=2,
+)
+
+llm_fin_gemini = ChatGoogleGenerativeAI(
+    model="gemini-2.0-flash",
+    google_api_key=google1_api_key,
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=2,
+    )
 
 
 # Schema for structured output to use in planning
@@ -87,6 +131,11 @@ class ReviewDatas(BaseModel):
     reviewDatas: List[ReviewData] = Field(description="Reviews of Data of the Code.",)
 
 structured_llm = llm_gemini.with_structured_output(ReviewDatas)
+
+structured_llm2 = llm_gemini2.with_structured_output(ReviewDatas)
+
+structured_llm_nithila = llm_nithila.with_structured_output(ReviewDatas)
+structured_llm_randinu = llm_randinu.with_structured_output(ReviewDatas)
 
 def line_numbers_handle(start_line_with_prefix, end_line_with_prefix):
     value1 = start_line_with_prefix
@@ -161,7 +210,7 @@ def security_handle(state: State):
     )
      try:
          logging.info("Invoking LLM for security handling...")
-         response = structured_llm.invoke(messages)
+         response = structured_llm_nithila.invoke(messages)
          print("Security handling response: \n",response)
          print("\n\n")
          if(response == None):
@@ -184,7 +233,7 @@ def performance_handle(state: State):
     )
      try:
          logging.info("Invoking LLM for performance handling...")
-         response = structured_llm.invoke(messages)
+         response = structured_llm_randinu.invoke(messages)
          print("Performance handling response: \n",response)
          print("\n\n")
          if(response == None):
@@ -207,7 +256,7 @@ def quality_handle(state: State):
     )
      try:
          logging.info("Invoking LLM for quality handling...")
-         response = structured_llm.invoke(messages)
+         response = structured_llm_randinu.invoke(messages)
          print("Quality handling response: \n",response)
          print("\n\n")
          if(response == None):
