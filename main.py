@@ -31,6 +31,9 @@ tools.initialize_neo4j_schema
 graph_workflow.execute_analysis
 
 
+#for duplicate check
+from src.duplicate_check.duplication_analyzer import perform_duplication_analysis
+
 # Configure the logger
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -257,9 +260,18 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
                                 else:
                                     print("No valid comments to post")
 
+                    # --- Perform code duplication analysis using the new function ---
+                duplication_summary_message, duplication_conclusion, duplication_output_details, duplicate_results = \
+                    perform_duplication_analysis(owner, repo_name, head_sha, issue)
+                
+                # Update check run with results
+                update_check_run(
+                    check_run=check_run,
+                    results=review_list
+                )
+
                     
             except Exception as e:
-                # Only update check run if it was successfully created
                 if check_run is not None:
                     check_run.edit(
                         status="completed",
@@ -270,7 +282,6 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
                         }
                     )
                 else:
-                    # Fallback error handling
                     print(f"Critical failure before check run creation: {str(e)}")
                     
                 raise
@@ -365,7 +376,6 @@ async def generator_with_session(session_id, repo_path, query):
             yield chunk
     finally:
         current_session_id.reset(token)
-
 @app.post("/analyze")
 async def analyze_repository(request: QueryRequest):
     """

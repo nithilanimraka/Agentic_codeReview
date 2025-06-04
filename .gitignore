@@ -4,3 +4,4 @@ myenv
 app.pem
 __pycache__/
 faiss_index
+venv
