@@ -2,6 +2,7 @@ import os
 from typing import List, Dict, Optional, TypedDict,Annotated
 from pydantic import BaseModel, Field, field_validator, ValidationError, ConfigDict
 import logging 
+import json 
 
 import os
 from dotenv import load_dotenv
@@ -23,12 +24,26 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 #     raise ValueError("GROQ_API_KEY is not set")
 
 google1_api_key = os.environ.get('GEMINI_API_REVIEW_KEY')
+google1_api_key = os.environ.get('GEMINI_API_REVIEW_KEY')
 if not google1_api_key:
     raise ValueError("GOOGLE_API_KEY is not set")
 
 gemini_api_key = os.environ.get('GEMINI_API_KEY')
 if not gemini_api_key:
     raise ValueError("GEMINI_API_KEY is not set")
+
+
+gemini_api_key2 = os.environ.get('GOOGLE_API_KEY')
+if not gemini_api_key:
+    raise ValueError("GEMINI_API_KEY is not set")
+
+nithila_api_key = os.environ.get('NITHILA_GOOGLE_API_KEY')
+if not nithila_api_key:
+    raise ValueError("NITHILA_API_KEY is not set")
+
+randinu_api_key = os.environ.get('RANDINU_GOOGLE_API_KEY')
+if not randinu_api_key:
+    raise ValueError("RANDINU_API_KEY is not set")
 
 
 gemini_api_key2 = os.environ.get('GOOGLE_API_KEY')
@@ -136,6 +151,11 @@ structured_llm2 = llm_gemini2.with_structured_output(ReviewDatas)
 structured_llm_nithila = llm_nithila.with_structured_output(ReviewDatas)
 structured_llm_randinu = llm_randinu.with_structured_output(ReviewDatas)
 
+structured_llm2 = llm_gemini2.with_structured_output(ReviewDatas)
+
+structured_llm_nithila = llm_nithila.with_structured_output(ReviewDatas)
+structured_llm_randinu = llm_randinu.with_structured_output(ReviewDatas)
+
 def line_numbers_handle(start_line_with_prefix, end_line_with_prefix):
     value1 = start_line_with_prefix
     print("before remove prefix start line:", value1)
@@ -168,7 +188,7 @@ def line_numbers_handle(start_line_with_prefix, end_line_with_prefix):
 
 class State(TypedDict):
     PR_data: str
-    #PR_title: str
+    dependency_analysis: str
     error_issues: list[ReviewData]
     security_issues: list[ReviewData]
     performance_issues: list[ReviewData]
@@ -177,10 +197,12 @@ class State(TypedDict):
     all_issues: str
 
 
-
 #nodes
 def error_handle(state: State):
-     messages = prompt_templates.error_prompt.format_messages(PR_data=state["PR_data"])
+     messages = prompt_templates.error_prompt.format_messages(
+        PR_data=state["PR_data"],
+        dependency_analysis=state["dependency_analysis"] # Add this line
+    )
      try:
          logging.info("Invoking LLM for error handling...")
          response = structured_llm.invoke(messages)
@@ -201,9 +223,13 @@ def error_handle(state: State):
          return {"error_issues": []} # Return empty list on other errors
 
 def security_handle(state: State):
-     messages = prompt_templates.security_prompt.format_messages(PR_data=state["PR_data"])
+     messages = prompt_templates.security_prompt.format_messages(
+        PR_data=state["PR_data"],
+        dependency_analysis=json.dumps(state.get("dependency_analysis", {}), indent=2)  
+    )
      try:
          logging.info("Invoking LLM for security handling...")
+         response = structured_llm_nithila.invoke(messages)
          response = structured_llm_nithila.invoke(messages)
          print("Security handling response: \n",response)
          print("\n\n")
@@ -221,9 +247,13 @@ def security_handle(state: State):
          return {"security_issues": []}
 
 def performance_handle(state: State):
-     messages = prompt_templates.performance_prompt.format_messages(PR_data=state["PR_data"])
+     messages = prompt_templates.performance_prompt.format_messages(
+        PR_data=state["PR_data"],
+        dependency_analysis=json.dumps(state.get("dependency_analysis", {}), indent=2)
+    )
      try:
          logging.info("Invoking LLM for performance handling...")
+         response = structured_llm_randinu.invoke(messages)
          response = structured_llm_randinu.invoke(messages)
          print("Performance handling response: \n",response)
          print("\n\n")
@@ -241,9 +271,13 @@ def performance_handle(state: State):
          return {"performance_issues": []}
 
 def quality_handle(state: State):
-     messages = prompt_templates.quality_prompt.format_messages(PR_data=state["PR_data"])
+     messages = prompt_templates.quality_prompt.format_messages(
+        PR_data=state["PR_data"],
+        dependency_analysis=json.dumps(state.get("dependency_analysis", {}), indent=2)  # Add this line
+    )
      try:
          logging.info("Invoking LLM for quality handling...")
+         response = structured_llm_randinu.invoke(messages)
          response = structured_llm_randinu.invoke(messages)
          print("Quality handling response: \n",response)
          print("\n\n")
@@ -261,7 +295,10 @@ def quality_handle(state: State):
          return {"quality_issues": []}
 
 def other_handle(state: State):
-     messages = prompt_templates.other_prompt.format_messages(PR_data=state["PR_data"])
+     messages = prompt_templates.other_prompt.format_messages(
+        PR_data=state["PR_data"],
+        dependency_analysis=json.dumps(state.get("dependency_analysis", {}), indent=2)  # Add this line
+    )
      try:
          logging.info("Invoking LLM for other handling...")
          response = structured_llm.invoke(messages)
@@ -316,7 +353,7 @@ def aggregator(state: State):
 
     return {"all_issues": final_str}
 
-def invoke(structured_diff_text: str):
+def invoke(structured_diff_text: str, dependency_analysis: dict = None) -> dict:
 
     # Build workflow
     parallel_builder = StateGraph(State)
@@ -346,7 +383,10 @@ def invoke(structured_diff_text: str):
     # Show workflow
     # display(Image(parallel_workflow.get_graph().draw_mermaid_png()))
 
-    state = parallel_workflow.invoke({"PR_data": structured_diff_text})
+    state = parallel_workflow.invoke({
+        "PR_data": structured_diff_text,
+        "dependency_analysis": dependency_analysis
+    })
     final_issues=state["all_issues"]
 
     return final_issues
@@ -386,10 +426,10 @@ final_prompt= ChatPromptTemplate.from_messages([
 ])
 
 
-def final_review(pr_data:str) -> List[Dict]:
+def final_review(pr_data: str, dependency_analysis: str) -> List[Dict]:
     print("Entered final review function")
      
-    final_issues=invoke(pr_data)
+    final_issues=invoke(pr_data, dependency_analysis)
     print("--- Collected Issues ---")
     print(final_issues) # Print the aggregated issues before sending to OpenAI
     print("------------------------")
@@ -398,4 +438,3 @@ def final_review(pr_data:str) -> List[Dict]:
     print("done final review")
 
     return [review.model_dump() for review in final_response.finalReviews]
-
