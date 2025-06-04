@@ -285,17 +285,6 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
                     print(f"Critical failure before check run creation: {str(e)}")
                     
                 raise
-
-
-            # Trigger analysis
-            # background_tasks.add_task(execute_analysis_and_handle_result, pr_data, structured_diff_text)
-            return {
-                "status": "analysis_started",
-                "pr_number": pr_number,
-                "repo": f"{owner}/{repo_name}"
-            }
-
-
             
     return {}
 
