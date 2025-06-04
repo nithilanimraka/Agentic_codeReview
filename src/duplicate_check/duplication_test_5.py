@@ -87,8 +87,6 @@ else:
 GLOBAL_TYPE_MAP = {t: i for i, t in enumerate(GLOBAL_NODE_TYPES)}
 GLOBAL_TYPE_COUNT = len(GLOBAL_NODE_TYPES)
 
-#print(f"Initialized Global Node Type Vocabulary with {GLOBAL_TYPE_COUNT} types.")
-
 
 def _load_parsers(languages):
     parsers = {}
