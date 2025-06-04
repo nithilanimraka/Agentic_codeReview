@@ -153,16 +153,6 @@ async def webhook(request: Request, x_hub_signature: str = Header(None)):
                     check_run=check_run,
                     results=review_list
                 )
-
-                final_summary = (
-                    f"LLM diff review comments posted.\n"
-                    f"{duplication_summary_message}"
-                )
-                final_text_output = (
-                    "Detailed LLM review comments have been posted on the pull request.\n\n"
-                    + (duplication_output_details if duplicate_results else "No detailed duplication output.")
-                )
-
                     
             except Exception as e:
                 if check_run is not None:
