@@ -244,8 +244,8 @@ def refine_ast(node, code):
     return new_node
 
 # Load model directly
-tokenizer = AutoTokenizer.from_pretrained('Salesforce/codet5p-110m-embedding')
-model = AutoModel.from_pretrained('Salesforce/codet5p-110m-embedding', trust_remote_code=True)
+tokenizer = AutoTokenizer.from_pretrained('Salesforce/codet5p-110m-embedding', token=HF_TOKEN)
+model = AutoModel.from_pretrained('Salesforce/codet5p-110m-embedding', token=HF_TOKEN, trust_remote_code=True)
 content_model = model
 print(f"DEBUG: Forcing model to use device: {device}")
 content_model.to(device)
@@ -801,8 +801,8 @@ def revised_pipeline(codebase_path, languages=['python', 'java'], threshold=0.85
     try:
         global device 
 
-        local_tokenizer = AutoTokenizer.from_pretrained('Salesforce/codet5p-110m-embedding')
-        local_model = AutoModel.from_pretrained('Salesforce/codet5p-110m-embedding', trust_remote_code=True) 
+        local_tokenizer = AutoTokenizer.from_pretrained('Salesforce/codet5p-110m-embedding', token=HF_TOKEN)
+        local_model = AutoModel.from_pretrained('Salesforce/codet5p-110m-embedding', token=HF_TOKEN, trust_remote_code=True) 
         local_content_model = local_model
         local_content_model.to(device) 
 

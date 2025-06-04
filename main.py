@@ -85,12 +85,6 @@ async def webhook(request: Request, x_hub_signature: str = Header(None)):
                 review_list = final_review(structured_diff_text)
 
                 print("After llm call ...")
-                
-                # Update check run with results
-                update_check_run(
-                    check_run=check_run,
-                    results=review_list
-                )
 
                 # Post each review item as a comment on the PR
                 for review in review_list:
@@ -153,6 +147,12 @@ async def webhook(request: Request, x_hub_signature: str = Header(None)):
                 # --- Perform code duplication analysis using the new function ---
                 duplication_summary_message, duplication_conclusion, duplication_output_details, duplicate_results = \
                     perform_duplication_analysis(owner, repo_name, head_sha, issue)
+                
+                # Update check run with results
+                update_check_run(
+                    check_run=check_run,
+                    results=review_list
+                )
 
                 final_summary = (
                     f"LLM diff review comments posted.\n"
@@ -162,19 +162,6 @@ async def webhook(request: Request, x_hub_signature: str = Header(None)):
                     "Detailed LLM review comments have been posted on the pull request.\n\n"
                     + (duplication_output_details if duplicate_results else "No detailed duplication output.")
                 )
-                if check_run:
-                    check_run.edit(
-                        status="completed",
-                        conclusion=duplication_conclusion, # Reflects the duplication check outcome primarily
-                        output={
-                            "title": "Code Review & Duplication Analysis Complete",
-                            "summary": final_summary,
-                            "text": final_text_output
-                        }
-                    )
-                else:
-                    logger.error("check_run object was None before final update. Cannot update GitHub check status for duplication analysis.")
-                #end of duplication analysis
 
                     
             except Exception as e:
