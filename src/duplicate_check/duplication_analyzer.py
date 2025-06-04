@@ -1,6 +1,8 @@
 import sys
 import os
+import faulthandler
 
+faulthandler.enable()
 current_script_dir = os.path.dirname(os.path.abspath(__file__))
 
 project_root = os.path.dirname(os.path.dirname(current_script_dir))

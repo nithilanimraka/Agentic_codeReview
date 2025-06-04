@@ -80,7 +80,7 @@ llm_randinu = ChatGoogleGenerativeAI(
 
 llm_fin_gemini = ChatGoogleGenerativeAI(
     model="gemini-2.0-flash",
-    google_api_key=nithila_api_key,
+    google_api_key=gemini_api_key2,
     temperature=0,
     max_tokens=None,
     timeout=60,

@@ -22,6 +22,14 @@ load_dotenv()
 # Now, retrieve the token from the environment
 HF_TOKEN = os.getenv("HF_TOKEN")
 
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1" 
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
+torch.set_num_threads(1)
+
 GLOBAL_NODE_TYPES = sorted(list(set([
     # Common types from before
     'identifier', 'block', 'expression_statement', 'string', 'integer',
@@ -64,6 +72,16 @@ GLOBAL_NODE_TYPES = sorted(list(set([
     ')', 
 
 ])))
+
+if torch.backends.mps.is_available():
+    device = torch.device("mps")
+    print("Using Apple Metal Performance Shaders (MPS) device (GPU).")
+elif torch.cuda.is_available(): # Included for completeness, unlikely on a Mac
+    device = torch.device("cuda")
+    print("Using NVIDIA CUDA device (GPU).")
+else:
+    device = torch.device("cpu")
+    print("Using CPU device.")
 
 # Create a mapping from type name to index
 GLOBAL_TYPE_MAP = {t: i for i, t in enumerate(GLOBAL_NODE_TYPES)}
@@ -228,9 +246,11 @@ def refine_ast(node, code):
     return new_node
 
 # Load model directly
-tokenizer = AutoTokenizer.from_pretrained('Salesforce/codet5p-110m-embedding' , token=HF_TOKEN)
-model = AutoModel.from_pretrained('Salesforce/codet5p-110m-embedding' , token=HF_TOKEN, trust_remote_code=True)
+tokenizer = AutoTokenizer.from_pretrained('Salesforce/codet5p-110m-embedding')
+model = AutoModel.from_pretrained('Salesforce/codet5p-110m-embedding', trust_remote_code=True)
 content_model = model
+print(f"DEBUG: Forcing model to use device: {device}")
+content_model.to(device)
 
 
 def ast_to_graph(refined_ast, lang, tokenizer, content_model, type_map, type_count): 
@@ -268,6 +288,7 @@ def ast_to_graph(refined_ast, lang, tokenizer, content_model, type_map, type_cou
             try:
                 inputs = tokenizer(node_content, return_tensors='pt', truncation=True, max_length=512, padding=True)
                 with torch.no_grad():
+                    inputs = {k: v.to(device) for k, v in inputs.items()}
                     outputs = content_model(**inputs)  
                 if isinstance(outputs, torch.Tensor):
                     embedding_tensor = outputs.mean(dim=1).squeeze()
@@ -780,11 +801,14 @@ def revised_pipeline(codebase_path, languages=['python', 'java'], threshold=0.85
     """Revised pipeline integrating corrections"""
 
     try:
-        tokenizer = AutoTokenizer.from_pretrained('Salesforce/codet5p-110m-embedding', token=HF_TOKEN)
-        model = AutoModel.from_pretrained('Salesforce/codet5p-110m-embedding', token=HF_TOKEN, trust_remote_code=True)
-        content_model = model
+        global device 
 
-        config = content_model.config
+        local_tokenizer = AutoTokenizer.from_pretrained('Salesforce/codet5p-110m-embedding')
+        local_model = AutoModel.from_pretrained('Salesforce/codet5p-110m-embedding', trust_remote_code=True) 
+        local_content_model = local_model
+        local_content_model.to(device) 
+
+        config = local_content_model.config
         TRANSFORMER_HIDDEN_SIZE = config.hidden_size 
         print(f"Using Transformer Hidden Size: {TRANSFORMER_HIDDEN_SIZE}")
 
@@ -819,7 +843,7 @@ def revised_pipeline(codebase_path, languages=['python', 'java'], threshold=0.85
             func_unit['refined_ast'] = refined_ast_dict 
 
 
-            graph = ast_to_graph(refined_ast_dict, func_unit['lang'], tokenizer, content_model, GLOBAL_TYPE_MAP, GLOBAL_TYPE_COUNT)
+            graph = ast_to_graph(refined_ast_dict, func_unit['lang'], local_tokenizer, local_content_model, GLOBAL_TYPE_MAP, GLOBAL_TYPE_COUNT)
             func_unit['graph'] = graph 
 
             if graph is None or graph.number_of_nodes() == 0:
