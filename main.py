@@ -339,13 +339,17 @@ async def code_review_endpoint(review_request: CodeReviewRequest):
         parsed_files = parse_diff_file_line_numbers(diff_content)
 
         logger.info("Building review prompt...")
-        structured_prompt = build_review_prompt_with_file_line_numbers(parsed_files)
+        structured_diff_text = build_review_prompt_with_file_line_numbers(parsed_files)
 
         logger.info("Generating final review...")
-        # Run the potentially long-running LLM call in a thread pool
-        review_list = await asyncio.to_thread(final_review, structured_prompt)
-        logger.info(f"Code review generated successfully with {len(review_list)} items.")
+        # Run the review with empty dependency analysis if none is provided
+        review_list = await asyncio.to_thread(
+            final_review,
+            pr_data=structured_diff_text,
+            dependency_analysis={}  # Default empty dict if no dependencies are available
+        )
 
+        logger.info(f"Code review generated successfully with {len(review_list)} items.")
         return JSONResponse(content=review_list)
 
     except HTTPException as http_exc:
