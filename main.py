@@ -196,12 +196,6 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
 
                     print("After llm call ...")
                     
-                    # Update check run with results
-                    update_check_run(
-                        check_run=check_run,
-                        results=review_list
-                    )
-
                     # Post each review item as a comment on the PR
                     for review in review_list:
                         print("\n\n========================")
