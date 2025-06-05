@@ -45,6 +45,8 @@ def perform_duplication_analysis(owner: str, repo_name: str, head_sha: str, issu
                                    duplication_output_details: str,
                                    duplicate_results: list).
     """
+
+    logger.info(f"DUPLICATION_TASK_STARTED: Thread for perform_duplication_analysis (PR head_sha: {head_sha[:7]}) is now running.") 
     duplication_summary_message = "Duplication analysis not run."
     duplication_conclusion = "neutral"
     duplication_output_details = "No detailed duplication output."
@@ -134,11 +136,6 @@ def perform_duplication_analysis(owner: str, repo_name: str, head_sha: str, issu
                 else: # Fallback, should not happen if duplicate_results is not empty
                     duplication_summary_message = "Potential duplicate code pairs found. See PR comments for details."
                     duplication_conclusion = "action_required"
-
-                try:
-                    issue.create_comment(duplication_output_details)
-                except Exception as e_comment_dup:
-                    logger.error(f"Failed to post duplication results comment: {e_comment_dup}")
 
             else:
                 logger.info("No significant duplicate code pairs found by the analysis.")

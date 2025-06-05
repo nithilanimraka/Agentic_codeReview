@@ -158,21 +158,16 @@ structured_llm_randinu = llm_randinu.with_structured_output(ReviewDatas)
 
 def line_numbers_handle(start_line_with_prefix, end_line_with_prefix):
     value1 = start_line_with_prefix
-    print("before remove prefix start line:", value1)
     if(start_line_with_prefix[0]=='-'): 
         start_line = int(value1.replace("-", "").strip())  # Remove '+' and strip spaces
     else:
         start_line = int(value1.replace("+", "").strip())
-    print("after removing prefix start line:", start_line)
 
     value2 = end_line_with_prefix
-    print("before remove prefix end line:", value2)
     if(end_line_with_prefix[0]=='-'):
         end_line = int(value2.replace("-", "").strip())
     else:
         end_line = int(value2.replace("+", "").strip()) 
-    print("after removing prefix end line:", end_line)
-    print()
 
     return start_line, end_line
      
@@ -206,8 +201,6 @@ def error_handle(state: State):
      try:
          logging.info("Invoking LLM for error handling...")
          response = structured_llm.invoke(messages)
-         print("Error handling response: \n",response)
-         print("\n\n")
          if(response == None):
              logging.info("LLM call for error handling successful. Found 0 issues.")
              return {"error_issues": []}
@@ -231,8 +224,6 @@ def security_handle(state: State):
          logging.info("Invoking LLM for security handling...")
          response = structured_llm_nithila.invoke(messages)
          response = structured_llm_nithila.invoke(messages)
-         print("Security handling response: \n",response)
-         print("\n\n")
          if(response == None):
              logging.info("LLM call for security handling successful. Found 0 issues.")
              return {"security_issues": []}
@@ -255,8 +246,6 @@ def performance_handle(state: State):
          logging.info("Invoking LLM for performance handling...")
          response = structured_llm_randinu.invoke(messages)
          response = structured_llm_randinu.invoke(messages)
-         print("Performance handling response: \n",response)
-         print("\n\n")
          if(response == None):
              logging.info("LLM call for performance handling successful. Found 0 issues.")
              return {"performance_issues": []}
@@ -279,8 +268,6 @@ def quality_handle(state: State):
          logging.info("Invoking LLM for quality handling...")
          response = structured_llm_randinu.invoke(messages)
          response = structured_llm_randinu.invoke(messages)
-         print("Quality handling response: \n",response)
-         print("\n\n")
          if(response == None):
              logging.info("LLM call for quality handling successful. Found 0 issues.")
              return {"quality_issues": []}
@@ -302,8 +289,6 @@ def other_handle(state: State):
      try:
          logging.info("Invoking LLM for other handling...")
          response = structured_llm.invoke(messages)
-         print("Other handling response: \n",response)
-         print("\n\n")
          if(response == None):
              logging.info("LLM call for other handling successful. Found 0 issues.")
              return {"other_issues": []}

@@ -52,13 +52,14 @@ class CodeReviewRequest(BaseModel):
     """Pydantic model for the /code-review endpoint request body."""
     diff_content: str
 
-check_run = None  # Initialize globally
 
 @app.post("/webhook")
 async def webhook(request: Request, x_hub_signature: str = Header(None), background_tasks: BackgroundTasks = BackgroundTasks):
     payload = await request.body()
     verify_signature(payload, x_hub_signature)
     payload_dict = json.loads(payload)
+
+    check_run = None  # Initialize check_run to None
     
     if "repository" in payload_dict:
         owner = payload_dict["repository"]["owner"]["login"]
@@ -83,6 +84,7 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
                 
                 #newly added to get pull request diff
                 pull_request = repo.get_pull(pr_number)
+                issue = repo.get_issue(number=pr_number)
 
                 pr_title = pull_request.title
                 if not pr_title:  # Checks if title is None or an empty string ""
@@ -91,8 +93,11 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
               
                 #Get diff
                 diff_url = pull_request.diff_url
-                response = requests.get(diff_url)
+                logger.info(f"Fetching diff from {diff_url}...")
+                response = await asyncio.to_thread(requests.get,diff_url)
+                response.raise_for_status() # Check for HTTP errors
                 diff_text = response.text
+                logger.info(f"Successfully fetched diff for PR #{pr_number}.")
 
                 token_count = count_tokens(diff_text)
                 MAX_TOKENS_PER_CHUNK=970000  # Set a threshold for large diffs
@@ -102,13 +107,13 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
                     logger.info(f"Diff too large ({token_count} tokens), using chunked analysis")
                     
                     # Post initial comment
-                    issue = repo.get_issue(number=pr_number)
                     issue.create_comment(
                         "Hi, I'm analyzing this large PR. This might take a few moments..."
                     )
                     
                     # Call analyze_chunks endpoint
-                    analysis_comment = analyze_pr(pr_title,diff_text)
+                    # Offload analyze_pr to a thread
+                    analysis_comment = await asyncio.to_thread(analyze_pr, pr_title, diff_text)
                     
                     # Post the final analysis
                     issue.create_comment(analysis_comment)
@@ -127,32 +132,29 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
                     
                 else:
 
+                    logger.info(f"Starting background duplication analysis for PR #{pr_number}...")
+                    duplication_analysis_task = asyncio.create_task( 
+                        asyncio.to_thread(
+                        perform_duplication_analysis, owner, repo_name, head_sha, issue
+                        )
+                    )
+
                     # Parse the diff to extract actual file line numbers.
-                    parsed_files = parse_diff_file_line_numbers(response.text)
+                    parsed_files = parse_diff_file_line_numbers(diff_text)
         
                     # Build a structured diff text for the prompt.
                     structured_diff_text = build_review_prompt_with_file_line_numbers(parsed_files)
-                    print(structured_diff_text)
 
                     print("Before llm call...")
 
-                    issue = repo.get_issue(number=pr_number)
+                    
                     issue.create_comment(
                         "Hi, I am a code reviewer bot. I will analyze the PR and provide detailed review comments."
                     )
 
-                    feedback_pr= analyze_pr_summary(pr_title,response.text)
-                    
-                    if feedback_pr: # Only post if feedback was successfully generated
-                        try:
-                            posted_comment = issue.create_comment(body=feedback_pr)
-                            logger.info(f"Successfully posted feedback comment: {posted_comment.html_url}")
-                        except Exception as e:
-                            logger.error(f"An unexpected error occurred posting feedback: {str(e)}", exc_info=True)
-                    else:
-                        logger.warning("No feedback was generated or analysis failed, skipping comment posting.")
-
-
+                    analyze_pr_summary_task = asyncio.create_task(
+                        asyncio.to_thread(analyze_pr_summary, pr_title, diff_text,check_run)
+                    )
 
                     # Get owner/repo
                     owner, repo_name = tools.get_github_owner_repo(repo_url)
@@ -187,19 +189,37 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
                     "repo": repo_name
                     }
 
-                    analysis_result = execute_analysis_and_handle_result(pr_data, structured_diff_text)
+                    logger.info(f"Offloading dependency analysis for PR #{pr_number}...")
+                    execute_analysis_task = asyncio.create_task(
+                        asyncio.to_thread(execute_analysis_and_handle_result, pr_data, structured_diff_text)
+                    )
+
+                    # Wait for the first set of LLM tasks 
+                    feedback_pr = await analyze_pr_summary_task
+                    if feedback_pr:
+                        try:
+                            posted_comment = issue.create_comment(body=feedback_pr)
+                            logger.info(f"Successfully posted PR title feedback for PR #{pr_number}: {posted_comment.html_url}")
+                        except Exception as e:
+                            logger.error(f"Error posting PR title feedback for PR #{pr_number}: {str(e)}", exc_info=True)
+
+                    analysis_result = await execute_analysis_task
                     dependency_data = analysis_result.get("dependency_analysis", {})
-                    review_list = final_review(
-                                    structured_diff_text, 
-                                    dependency_analysis=dependency_data
-                                )
+                    logger.info(f"Dependency analysis completed for PR #{pr_number}.")
+
+                    # Start the final review LLM task (depends on dependency_data) 
+                    logger.info(f"Offloading final LLM code review for PR #{pr_number}...")
+                    final_review_task = asyncio.to_thread(final_review, structured_diff_text, dependency_data)
+                    review_list = await final_review_task
+                    logger.info(f"LLM final_review completed for PR #{pr_number}, found {len(review_list)} items.")
+
 
                     print("After llm call ...")
                     
                     # Post each review item as a comment on the PR
                     for review in review_list:
-                        print("\n\n========================")
-                        print(review)
+                        # print("\n\n========================")
+                        # print(review)
 
                         # Get the line numbers (int) for the review
                         start_line, end_line = line_numbers_handle(review['start_line_with_prefix'], review['end_line_with_prefix'])
@@ -253,17 +273,20 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
                                     print("Error details:", json.dumps(e.data, indent=2))
                                 else:
                                     print("No valid comments to post")
-
-                    # --- Perform code duplication analysis using the new function ---
-                duplication_summary_message, duplication_conclusion, duplication_output_details, duplicate_results = \
-                    perform_duplication_analysis(owner, repo_name, head_sha, issue)
-                
-                # Update check run with results
-                update_check_run(
-                    check_run=check_run,
-                    results=review_list
-                )
-
+                        
+                    logger.info(f"Waiting for background duplication analysis for PR #{pr_number}...")
+                    _, duplication_conclusion_status, duplication_output_details, _ = await duplication_analysis_task
+                    try:
+                        issue.create_comment(duplication_output_details)
+                    except Exception as e_comment_dup:
+                        logger.error(f"Failed to post duplication results comment: {e_comment_dup}")
+                    logger.info(f"Duplication analysis complete for PR #{pr_number}. Conclusion: {duplication_conclusion_status}")
+                    
+                    # Update check run with results
+                    update_check_run(
+                        check_run=check_run,
+                        results=review_list
+                    )
                     
             except Exception as e:
                 if check_run is not None:
@@ -282,7 +305,7 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
             
     return {}
 
-def analyze_pr_summary(pr_title,code_diff):
+def analyze_pr_summary(pr_title,code_diff,check_run):
     feedback = None # Initialize feedback to None
     try:
         logger.info("Starting PR analysis with diff...")
