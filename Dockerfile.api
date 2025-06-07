@@ -1,0 +1,36 @@
+# ---------- Stage 1 : builder ----------
+FROM python:3.12 AS builder
+WORKDIR /app
+ENV PIP_NO_CACHE_DIR=off \
+    PYTHONDONTWRITEBYTECODE=1 \
+    POETRY_HOME=/opt/poetry
+COPY requirements.txt .
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        gcc git && \
+    pip install --upgrade pip && \
+    pip wheel --wheel-dir /wheels -r requirements.txt
+
+# ---------- Stage 2 : runtime ----------
+FROM python:3.12
+LABEL org.opencontainers.image.source="https://github.com/nithilanimraka/Agentic_codeReview"
+WORKDIR /app
+# 1 – runtime deps
+COPY --from=builder /wheels /wheels
+RUN pip install --no-cache-dir /wheels/*
+# 2 – project code
+COPY . /app
+# 3 – download HF model once, into /models (≈950 MB)
+ARG HF_TOKEN
+RUN python - <<'PY'
+import os, subprocess, pathlib, sys
+model = "Salesforce/codet5p-110m-embedding"
+cache = pathlib.Path("/models"); cache.mkdir(exist_ok=True)
+subprocess.check_call([
+    sys.executable, "-m", "pip", "install", "--no-cache-dir", "huggingface_hub"
+])
+from huggingface_hub import snapshot_download
+snapshot_download(repo_id=model, cache_dir=cache, token=os.getenv("HF_TOKEN"))
+PY
+ENV TRANSFORMERS_CACHE=/models
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

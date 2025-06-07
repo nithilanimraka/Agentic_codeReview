@@ -22,6 +22,30 @@ from src.dependency_analysis import ai_agents
 from src.dependency_analysis import graph_workflow
 from src.dependency_analysis import tools
 
+def write_private_key_from_env():
+    """
+    Reads the content of the GitHub private key from an environment variable
+    and writes it to a temporary file inside the container.
+    """
+    # We will create an environment variable called GITHUB_PRIVATE_KEY_CONTENTS in Azure
+    private_key_content = os.getenv("GITHUB_PRIVATE_KEY_CONTENTS")
+    
+    # This is a temporary path inside the cloud container where the file will be created
+    pem_file_path = "/tmp/app.pem" 
+    
+    if private_key_content:
+        # Write the content to the temp file
+        with open(pem_file_path, "w") as f:
+            # The .replace() handles newline characters correctly
+            f.write(private_key_content.replace('\\n', '\n'))
+        
+        # Now, set the PRIVATE_KEY_PATH that your `authenticate_github.py` script expects
+        os.environ["PRIVATE_KEY_PATH"] = pem_file_path
+        print(f"GitHub private key has been written to {pem_file_path}")
+
+# Call this function once at the very start of your application
+write_private_key_from_env()
+
 load_dotenv()
 
 tools.get_github_owner_repo

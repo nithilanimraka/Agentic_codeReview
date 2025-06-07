@@ -1,0 +1,39 @@
+version: '3.9'
+
+services:
+  neo4j:
+    image: neo4j:5.19-community
+    restart: unless-stopped
+    volumes:
+      - neo4j_data:/data
+    environment:
+      # docker compose will substitute from .env
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-test123}
+    ports: ["7474:7474","7687:7687"]
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+      args:
+        HF_TOKEN: ${HF_TOKEN}              # still needed at build time
+    depends_on:
+      - neo4j
+
+    # 1️⃣ pull most settings from .env automatically
+    env_file:
+      - .env
+
+    # 2️⃣ override / add any that need a container-specific value
+    environment:
+      NEO4J_URI: bolt://neo4j:7687        # service-to-service hostname
+      PRIVATE_KEY_PATH: /keys/app.pem     # where the file will live inside
+
+    # 3️⃣ mount the GitHub APP key as a file
+    volumes:
+      - ./app.pem:/keys/app.pem:ro        # local path → in-container path
+
+    ports: ["8000:8000"]
+
+volumes:
+  neo4j_data:

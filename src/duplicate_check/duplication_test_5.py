@@ -30,6 +30,24 @@ os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
 torch.set_num_threads(1)
 
+# Define the cache directory that will be mounted from Azure Files
+MODEL_CACHE_DIR = "/mnt/modelcache" 
+
+# ... later in the file, when loading the models ...
+
+# Load model directly and specify cache directory
+tokenizer = AutoTokenizer.from_pretrained(
+    'Salesforce/codet5p-110m-embedding', 
+    token=HF_TOKEN, 
+    cache_dir=MODEL_CACHE_DIR
+)
+model = AutoModel.from_pretrained(
+    'Salesforce/codet5p-110m-embedding', 
+    token=HF_TOKEN, 
+    trust_remote_code=True, 
+    cache_dir=MODEL_CACHE_DIR
+)
+
 GLOBAL_NODE_TYPES = sorted(list(set([
     # Common types from before
     'identifier', 'block', 'expression_statement', 'string', 'integer',
