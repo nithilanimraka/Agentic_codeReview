@@ -2,6 +2,7 @@ import os
 from typing import List, Dict, Optional, TypedDict,Annotated
 from pydantic import BaseModel, Field, field_validator, ValidationError, ConfigDict
 import logging 
+import json 
 
 import os
 from dotenv import load_dotenv
@@ -22,13 +23,40 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # if not groq_api_key:
 #     raise ValueError("GROQ_API_KEY is not set")
 
-google1_api_key = os.environ.get('GOOGLE_API_KEY')
+google1_api_key = os.environ.get('GEMINI_API_REVIEW_KEY')
+google1_api_key = os.environ.get('GEMINI_API_REVIEW_KEY')
 if not google1_api_key:
     raise ValueError("GOOGLE_API_KEY is not set")
 
 gemini_api_key = os.environ.get('GEMINI_API_KEY')
 if not gemini_api_key:
     raise ValueError("GEMINI_API_KEY is not set")
+
+
+gemini_api_key2 = os.environ.get('GOOGLE_API_KEY')
+if not gemini_api_key:
+    raise ValueError("GEMINI_API_KEY is not set")
+
+nithila_api_key = os.environ.get('NITHILA_GOOGLE_API_KEY')
+if not nithila_api_key:
+    raise ValueError("NITHILA_API_KEY is not set")
+
+randinu_api_key = os.environ.get('RANDINU_GOOGLE_API_KEY')
+if not randinu_api_key:
+    raise ValueError("RANDINU_API_KEY is not set")
+
+
+gemini_api_key2 = os.environ.get('GOOGLE_API_KEY')
+if not gemini_api_key:
+    raise ValueError("GEMINI_API_KEY is not set")
+
+nithila_api_key = os.environ.get('NITHILA_GOOGLE_API_KEY')
+if not nithila_api_key:
+    raise ValueError("NITHILA_API_KEY is not set")
+
+randinu_api_key = os.environ.get('RANDINU_GOOGLE_API_KEY')
+if not randinu_api_key:
+    raise ValueError("RANDINU_API_KEY is not set")
 
 llm_gemini = ChatGoogleGenerativeAI(
     model="gemini-2.0-flash",
@@ -38,10 +66,41 @@ llm_gemini = ChatGoogleGenerativeAI(
     timeout=None,
     max_retries=2,
 )
+llm_gemini2 = ChatGoogleGenerativeAI(
+    model="gemini-2.0-flash",
+    google_api_key=gemini_api_key2,
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=2,
+)
 
-llm_fin_gemini = ChatGoogleGenerativeAI(model="gemini-2.0-flash",
-                        google_api_key=google1_api_key,
-                         temperature=0)
+llm_nithila = ChatGoogleGenerativeAI(
+    model="gemini-2.0-flash",
+    google_api_key=nithila_api_key,
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=2,
+)
+
+llm_randinu = ChatGoogleGenerativeAI(
+    model="gemini-2.0-flash",
+    google_api_key=randinu_api_key,
+    temperature=0,
+    max_tokens=None,
+    timeout=None,
+    max_retries=2,
+)
+
+llm_fin_gemini = ChatGoogleGenerativeAI(
+    model="gemini-2.0-flash",
+    google_api_key=gemini_api_key2,
+    temperature=0,
+    max_tokens=None,
+    timeout=60,
+    max_retries=2,
+    )
 
 
 # Schema for structured output to use in planning
@@ -87,23 +146,28 @@ class ReviewDatas(BaseModel):
 
 structured_llm = llm_gemini.with_structured_output(ReviewDatas)
 
+structured_llm2 = llm_gemini2.with_structured_output(ReviewDatas)
+
+structured_llm_nithila = llm_nithila.with_structured_output(ReviewDatas)
+structured_llm_randinu = llm_randinu.with_structured_output(ReviewDatas)
+
+structured_llm2 = llm_gemini2.with_structured_output(ReviewDatas)
+
+structured_llm_nithila = llm_nithila.with_structured_output(ReviewDatas)
+structured_llm_randinu = llm_randinu.with_structured_output(ReviewDatas)
+
 def line_numbers_handle(start_line_with_prefix, end_line_with_prefix):
     value1 = start_line_with_prefix
-    print("before remove prefix start line:", value1)
     if(start_line_with_prefix[0]=='-'): 
         start_line = int(value1.replace("-", "").strip())  # Remove '+' and strip spaces
     else:
         start_line = int(value1.replace("+", "").strip())
-    print("after removing prefix start line:", start_line)
 
     value2 = end_line_with_prefix
-    print("before remove prefix end line:", value2)
     if(end_line_with_prefix[0]=='-'):
         end_line = int(value2.replace("-", "").strip())
     else:
         end_line = int(value2.replace("+", "").strip()) 
-    print("after removing prefix end line:", end_line)
-    print()
 
     return start_line, end_line
      
@@ -119,7 +183,7 @@ def line_numbers_handle(start_line_with_prefix, end_line_with_prefix):
 
 class State(TypedDict):
     PR_data: str
-    #PR_title: str
+    dependency_analysis: str
     error_issues: list[ReviewData]
     security_issues: list[ReviewData]
     performance_issues: list[ReviewData]
@@ -128,15 +192,15 @@ class State(TypedDict):
     all_issues: str
 
 
-
 #nodes
 def error_handle(state: State):
-     messages = prompt_templates.error_prompt.format_messages(PR_data=state["PR_data"])
+     messages = prompt_templates.error_prompt.format_messages(
+        PR_data=state["PR_data"],
+        dependency_analysis=state["dependency_analysis"] # Add this line
+    )
      try:
          logging.info("Invoking LLM for error handling...")
          response = structured_llm.invoke(messages)
-         print("Error handling response: \n",response)
-         print("\n\n")
          if(response == None):
              logging.info("LLM call for error handling successful. Found 0 issues.")
              return {"error_issues": []}
@@ -152,12 +216,14 @@ def error_handle(state: State):
          return {"error_issues": []} # Return empty list on other errors
 
 def security_handle(state: State):
-     messages = prompt_templates.security_prompt.format_messages(PR_data=state["PR_data"])
+     messages = prompt_templates.security_prompt.format_messages(
+        PR_data=state["PR_data"],
+        dependency_analysis=json.dumps(state.get("dependency_analysis", {}), indent=2)  
+    )
      try:
          logging.info("Invoking LLM for security handling...")
-         response = structured_llm.invoke(messages)
-         print("Security handling response: \n",response)
-         print("\n\n")
+         response = structured_llm_nithila.invoke(messages)
+         response = structured_llm_nithila.invoke(messages)
          if(response == None):
              logging.info("LLM call for security handling successful. Found 0 issues.")
              return {"security_issues": []}
@@ -172,12 +238,14 @@ def security_handle(state: State):
          return {"security_issues": []}
 
 def performance_handle(state: State):
-     messages = prompt_templates.performance_prompt.format_messages(PR_data=state["PR_data"])
+     messages = prompt_templates.performance_prompt.format_messages(
+        PR_data=state["PR_data"],
+        dependency_analysis=json.dumps(state.get("dependency_analysis", {}), indent=2)
+    )
      try:
          logging.info("Invoking LLM for performance handling...")
-         response = structured_llm.invoke(messages)
-         print("Performance handling response: \n",response)
-         print("\n\n")
+         response = structured_llm_randinu.invoke(messages)
+         response = structured_llm_randinu.invoke(messages)
          if(response == None):
              logging.info("LLM call for performance handling successful. Found 0 issues.")
              return {"performance_issues": []}
@@ -192,12 +260,14 @@ def performance_handle(state: State):
          return {"performance_issues": []}
 
 def quality_handle(state: State):
-     messages = prompt_templates.quality_prompt.format_messages(PR_data=state["PR_data"])
+     messages = prompt_templates.quality_prompt.format_messages(
+        PR_data=state["PR_data"],
+        dependency_analysis=json.dumps(state.get("dependency_analysis", {}), indent=2)  # Add this line
+    )
      try:
          logging.info("Invoking LLM for quality handling...")
-         response = structured_llm.invoke(messages)
-         print("Quality handling response: \n",response)
-         print("\n\n")
+         response = structured_llm_randinu.invoke(messages)
+         response = structured_llm_randinu.invoke(messages)
          if(response == None):
              logging.info("LLM call for quality handling successful. Found 0 issues.")
              return {"quality_issues": []}
@@ -212,12 +282,13 @@ def quality_handle(state: State):
          return {"quality_issues": []}
 
 def other_handle(state: State):
-     messages = prompt_templates.other_prompt.format_messages(PR_data=state["PR_data"])
+     messages = prompt_templates.other_prompt.format_messages(
+        PR_data=state["PR_data"],
+        dependency_analysis=json.dumps(state.get("dependency_analysis", {}), indent=2)  # Add this line
+    )
      try:
          logging.info("Invoking LLM for other handling...")
          response = structured_llm.invoke(messages)
-         print("Other handling response: \n",response)
-         print("\n\n")
          if(response == None):
              logging.info("LLM call for other handling successful. Found 0 issues.")
              return {"other_issues": []}
@@ -267,7 +338,7 @@ def aggregator(state: State):
 
     return {"all_issues": final_str}
 
-def invoke(structured_diff_text: str):
+def invoke(structured_diff_text: str, dependency_analysis: dict = None) -> dict:
 
     # Build workflow
     parallel_builder = StateGraph(State)
@@ -297,7 +368,10 @@ def invoke(structured_diff_text: str):
     # Show workflow
     # display(Image(parallel_workflow.get_graph().draw_mermaid_png()))
 
-    state = parallel_workflow.invoke({"PR_data": structured_diff_text})
+    state = parallel_workflow.invoke({
+        "PR_data": structured_diff_text,
+        "dependency_analysis": dependency_analysis
+    })
     final_issues=state["all_issues"]
 
     return final_issues
@@ -337,15 +411,15 @@ final_prompt= ChatPromptTemplate.from_messages([
 ])
 
 
-def final_review(pr_data:str) -> List[Dict]:
+def final_review(pr_data: str, dependency_analysis: str) -> List[Dict]:
     print("Entered final review function")
      
-    final_issues=invoke(pr_data)
+    final_issues=invoke(pr_data, dependency_analysis)
     print("--- Collected Issues ---")
     print(final_issues) # Print the aggregated issues before sending to OpenAI
     print("------------------------")
 
     final_response= structured_gemini_llm.invoke(final_prompt.format_messages(PR_data=pr_data, Issues=final_issues))
+    print("done final review")
 
     return [review.model_dump() for review in final_response.finalReviews]
-
