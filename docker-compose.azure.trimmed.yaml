@@ -1,0 +1,18 @@
+# docker-compose.azure.trimmed.yaml
+version: "3.9"
+
+services:
+  api:
+    image: prreviewacr.azurecr.io/prreview-api:latest
+    environment:
+      # minimal vars so the app can start; we’ll inject the rest later
+      NEO4J_URI: "bolt://neo4j:7687"
+      NEO4J_USERNAME: "neo4j"
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}   # exported in your shell
+    ports:
+      - "80:8000"          # ACA uses this to expose ingress
+
+  neo4j:
+    image: neo4j:5.19-community
+    environment:
+      NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD}"
