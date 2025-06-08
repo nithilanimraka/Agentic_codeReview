@@ -2,7 +2,7 @@ name: Build & Deploy to Azure Container Apps
 
 on:
   push:
-    branches: [ main ]            # ← change to main unless you really use master
+    branches: [ master ]            # ← change to main unless you really use master
   workflow_dispatch:
 
 jobs:
