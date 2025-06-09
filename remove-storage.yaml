@@ -1,0 +1,6 @@
+# remove-storage.yaml
+template:
+  containers:
+  - name: api
+    image: prreviewacr.azurecr.io/prreview-api:debug
+    

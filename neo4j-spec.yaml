@@ -1,0 +1,44 @@
+# neo4j-spec.yaml (Final Version)
+properties:
+  configuration:
+    ingress:
+      external: false
+      targetPort: 7687
+      transport: Tcp
+      port: 7687
+  template:
+    containers:
+    - name: neo4j
+      image: neo4j:5.19-community
+      probes:
+        - type: liveness
+          tcpSocket:
+            port: 7687
+          initialDelaySeconds: 30
+          periodSeconds: 60
+        - type: readiness
+          tcpSocket:
+            port: 7687
+          initialDelaySeconds: 30
+          periodSeconds: 60
+        - type: startup
+          tcpSocket:
+            port: 7687
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          failureThreshold: 10
+      # We only need the essential environment variables.
+      # The default listen address is already correct.
+      env:
+      - name: NEO4J_AUTH
+        value: "neo4j/tharukaprabhashana"
+      - name: NEO4J_ACCEPT_LICENSE_AGREEMENT
+        value: "yes"
+    scale:
+      minReplicas: 1
+      maxReplicas: 10
+      rules:
+      - name: tcp-scaler
+        tcp:
+          metadata:
+            concurrentConnections: "10"

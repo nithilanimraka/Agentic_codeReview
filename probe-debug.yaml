@@ -1,0 +1,18 @@
+# probe-debug.yaml
+template:
+  containers:
+  - name: api
+    image: prreviewacr.azurecr.io/prreview-api:43cfd501a989563ea16c28cee2b87ac11386499e
+    probes:
+    - type: Liveness
+      exec:
+        command:
+        - /bin/true
+      initialDelaySeconds: 10
+      periodSeconds: 30
+    - type: Readiness
+      exec:
+        command:
+        - /bin/true
+      initialDelaySeconds: 10
+      periodSeconds: 30

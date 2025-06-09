@@ -1,0 +1,184 @@
+id: /subscriptions/70725dd9-0972-44f1-acd5-94ea97d28d1c/resourceGroups/prreview-rg/providers/Microsoft.App/containerapps/api
+identity:
+  type: SystemAssigned
+location: Australia East
+name: api
+properties:
+  configuration:
+    activeRevisionsMode: Single
+    dapr: null
+    identitySettings: []
+    ingress:
+      additionalPortMappings: null
+      allowInsecure: false
+      clientCertificateMode: Ignore
+      corsPolicy: null
+      customDomains: null
+      exposedPort: 0
+      external: true
+      fqdn: api.politeriver-4d9b3e63.australiaeast.azurecontainerapps.io
+      ipSecurityRestrictions: null
+      stickySessions:
+        affinity: none
+      targetPort: 8000
+      targetPortHttpScheme: null
+      traffic:
+      - latestRevision: true
+        weight: 100
+      transport: Http
+    maxInactiveRevisions: 100
+    registries:
+    - identity: ''
+      passwordSecretRef: prreviewacrazurecrio-prreviewacr
+      server: prreviewacr.azurecr.io
+      username: prreviewacr
+    revisionTransitionThreshold: null
+    runtime: null
+    secrets:
+    - identity: system
+      keyVaultUrl: https://prreview-kv.vault.azure.net/secrets/acr-password
+      name: prreviewacrazurecrio-prreviewacr
+    - identity: system
+      keyVaultUrl: https://prreview-kv.vault.azure.net/secrets/NITHILA-GOOGLE-API-KEY
+      name: nithila-google-api-key
+    - identity: system
+      keyVaultUrl: https://prreview-kv.vault.azure.net/secrets/NOTION-API-KEY
+      name: notion-api-key
+    - identity: system
+      keyVaultUrl: https://prreview-kv.vault.azure.net/secrets/OPENAI-API-KEY
+      name: openai-api-key
+    - identity: system
+      keyVaultUrl: https://prreview-kv.vault.azure.net/secrets/APP-ID
+      name: app-id
+    - identity: system
+      keyVaultUrl: https://prreview-kv.vault.azure.net/secrets/NEO4J-PASSWORD
+      name: neo4j-password
+    - identity: system
+      keyVaultUrl: https://prreview-kv.vault.azure.net/secrets/WEBHOOK-SECRET
+      name: webhook-secret
+    - identity: system
+      keyVaultUrl: https://prreview-kv.vault.azure.net/secrets/GOOGLE-API-KEY
+      name: google-api-key
+    - identity: system
+      keyVaultUrl: https://prreview-kv.vault.azure.net/secrets/RANDINU-GOOGLE-API-KEY
+      name: randinu-google-api-key
+    - identity: system
+      keyVaultUrl: https://prreview-kv.vault.azure.net/secrets/GOOGLE-DEP-API-KEY
+      name: google-dep-api-key
+    - identity: system
+      keyVaultUrl: https://prreview-kv.vault.azure.net/secrets/GEMINI-API-KEY
+      name: gemini-api-key
+    - identity: system
+      keyVaultUrl: https://prreview-kv.vault.azure.net/secrets/neo4j-uri1
+      name: neo4j-uri
+    - identity: system
+      keyVaultUrl: https://prreview-kv.vault.azure.net/secrets/GEMINI-API-REVIEW-KEY
+      name: gemini-api-review-key
+    - identity: system
+      keyVaultUrl: https://prreview-kv.vault.azure.net/secrets/HF-TOKEN
+      name: hf-token
+    service: null
+    targetLabel: ''
+  customDomainVerificationId: AD8CAC1D98DE43D7ECFD7FE8B7FE6196E2FC99EA1357901BA18EFD8019B49E91
+  delegatedIdentities: []
+  eventStreamEndpoint: https://australiaeast.azurecontainerapps.dev/subscriptions/70725dd9-0972-44f1-acd5-94ea97d28d1c/resourceGroups/prreview-rg/containerApps/api/eventstream
+  latestReadyRevisionName: api--0000006
+  latestRevisionFqdn: api--0000006.politeriver-4d9b3e63.australiaeast.azurecontainerapps.io
+  latestRevisionName: api--0000006
+  outboundIpAddresses:
+  - 20.92.129.121
+  - 20.53.190.131
+  - 20.53.190.243
+  - 20.92.129.47
+  - 20.53.142.228
+  - 20.53.137.166
+  - 20.53.136.251
+  - 20.53.137.23
+  - 20.53.136.177
+  - 20.53.139.235
+  - 20.227.4.70
+  - 20.227.4.57
+  - 20.227.4.60
+  - 20.227.4.52
+  - 20.11.108.13
+  - 20.11.108.40
+  - 20.11.107.220
+  - 20.11.107.247
+  - 20.11.107.106
+  - 20.11.108.46
+  - 4.254.94.53
+  patchingMode: Automatic
+  provisioningState: Succeeded
+  runningStatus: Running
+  template:
+    containers:
+    - env:
+      - name: APP_ID
+        secretRef: app-id
+      - name: WEBHOOK_SECRET
+        secretRef: webhook-secret
+      - name: OPENAI_API_KEY
+        secretRef: openai-api-key
+      - name: GEMINI_API_KEY
+        secretRef: gemini-api-key
+      - name: GOOGLE_API_KEY
+        secretRef: google-api-key
+      - name: GOOGLE_DEP_API_KEY
+        secretRef: google-dep-api-key
+      - name: GEMINI_API_REVIEW_KEY
+        secretRef: gemini-api-review-key
+      - name: RANDINU_GOOGLE_API_KEY
+        secretRef: randinu-google-api-key
+      - name: NITHILA_GOOGLE_API_KEY
+        secretRef: nithila-google-api-key
+      - name: NOTION_API_KEY
+        secretRef: notion-api-key
+      - name: HF_TOKEN
+        secretRef: hf-token
+      - name: NEO4J_PASSWORD
+        secretRef: neo4j-password
+      - name: PRIVATE_KEY_PATH
+        value: /app/secrets/app.pem
+      - name: NEO4J_URI
+        secretRef: neo4j-uri
+      - name: NEO4J_USERNAME
+        value: neo4j
+      - name: ROLLOUT
+        value: '1749416835'
+      image: prreviewacr.azurecr.io/prreview-api:43cfd501a989563ea16c28cee2b87ac11386499e
+      imageType: ContainerImage
+      name: api
+      resources:
+        cpu: 0.5
+        ephemeralStorage: 2Gi
+        memory: 1Gi
+      volumeMounts:
+      - mountPath: /models
+        volumeName: prshare
+      - mountPath: /app/secrets
+        subPath: secrets
+        volumeName: prshare
+    initContainers: null
+    revisionSuffix: ''
+    scale:
+      cooldownPeriod: 300
+      maxReplicas: 10
+      minReplicas: 1
+      pollingInterval: 30
+      rules: null
+    serviceBinds: null
+    terminationGracePeriodSeconds: null
+    volumes:
+    - name: prshare
+      storageName: prshare
+      storageType: AzureFile
+  workloadProfileName: Consumption
+resourceGroup: prreview-rg
+systemData:
+  createdAt: '2025-06-07T12:12:01.1598526'
+  createdBy: nimrakatmn.22@uom.lk
+  createdByType: User
+  lastModifiedAt: '2025-06-09T09:03:02.3815746'
+  lastModifiedBy: nimrakatmn.22@uom.lk
+  lastModifiedByType: User
+type: Microsoft.App/containerApps
