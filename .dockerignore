@@ -1,0 +1,21 @@
+# Git
+.git
+.gitignore
+
+# Docker
+.dockerignore
+Dockerfile
+
+# Local environment
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+app.pem
+*.egg-info/
+.venv/
+
+# Build artifacts
+build/
+dist/

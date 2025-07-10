@@ -252,7 +252,7 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
                                 side=end_line_side,  # side of the ending line of the code block
                                 )
                             except Exception as e:
-                                print(f"Failed to post comments: {str(e)}")
+                                print(f"Failed to post multi line comments: {str(e)}")
                                 if hasattr(e, 'data'):
                                     print("Error details:", json.dumps(e.data, indent=2))
                                 else:
@@ -268,7 +268,7 @@ async def webhook(request: Request, x_hub_signature: str = Header(None), backgro
                                 side=end_line_side, 
                                 )
                             except Exception as e:
-                                print(f"Failed to post comments: {str(e)}")
+                                print(f"Failed to post single line comments: {str(e)}")
                                 if hasattr(e, 'data'):
                                     print("Error details:", json.dumps(e.data, indent=2))
                                 else:

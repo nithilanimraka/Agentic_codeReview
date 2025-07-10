@@ -223,7 +223,6 @@ def security_handle(state: State):
      try:
          logging.info("Invoking LLM for security handling...")
          response = structured_llm_nithila.invoke(messages)
-         response = structured_llm_nithila.invoke(messages)
          if(response == None):
              logging.info("LLM call for security handling successful. Found 0 issues.")
              return {"security_issues": []}
@@ -245,7 +244,6 @@ def performance_handle(state: State):
      try:
          logging.info("Invoking LLM for performance handling...")
          response = structured_llm_randinu.invoke(messages)
-         response = structured_llm_randinu.invoke(messages)
          if(response == None):
              logging.info("LLM call for performance handling successful. Found 0 issues.")
              return {"performance_issues": []}
@@ -266,7 +264,6 @@ def quality_handle(state: State):
     )
      try:
          logging.info("Invoking LLM for quality handling...")
-         response = structured_llm_randinu.invoke(messages)
          response = structured_llm_randinu.invoke(messages)
          if(response == None):
              logging.info("LLM call for quality handling successful. Found 0 issues.")
@@ -419,7 +416,23 @@ def final_review(pr_data: str, dependency_analysis: str) -> List[Dict]:
     print(final_issues) # Print the aggregated issues before sending to OpenAI
     print("------------------------")
 
-    final_response= structured_gemini_llm.invoke(final_prompt.format_messages(PR_data=pr_data, Issues=final_issues))
-    print("done final review")
-
-    return [review.model_dump() for review in final_response.finalReviews]
+    try:
+        logging.info("Invoking LLM for final review...")
+        final_response = structured_gemini_llm.invoke(final_prompt.format_messages(PR_data=pr_data, Issues=final_issues))
+        
+        if final_response is None or not hasattr(final_response, 'finalReviews'):
+            logging.warning("LLM call for final review returned None or invalid response structure")
+            return []
+        
+        logging.info(f"Final review successful. Found {len(final_response.finalReviews)} review items.")
+        print("done final review")
+        return [review.model_dump() for review in final_response.finalReviews]
+        
+    except ValidationError as e:
+        logging.error(f"Pydantic Validation Error in final_review: {e}")
+        print("Validation error in final review - returning empty list")
+        return []
+    except Exception as e:
+        logging.error(f"Unexpected Error in final_review: {e}", exc_info=True)
+        print("Unexpected error in final review - returning empty list")
+        return []
