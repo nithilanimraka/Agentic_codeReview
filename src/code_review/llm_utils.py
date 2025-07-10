@@ -11,6 +11,8 @@ from langgraph.graph import StateGraph, START,END
 from langchain_core.prompts import ChatPromptTemplate
 import re
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.output_parsers import OutputFixingParser
+from langchain_core.output_parsers import PydanticOutputParser
 
 from src.code_review import prompt_templates
 
@@ -119,8 +121,16 @@ class FinalReview(BaseModel):
 
 class FinalReviews(BaseModel):
     finalReviews: List[FinalReview] = Field(..., description="Final Reviews of Data of the Code.",)
+    
+# structured_gemini_llm = llm_fin_gemini.with_structured_output(FinalReviews)
 
-structured_gemini_llm = llm_fin_gemini.with_structured_output(FinalReviews)
+# Create an explicit Pydantic parser instance
+final_reviews_parser = PydanticOutputParser(pydantic_object=FinalReviews)
+
+# Create an OutputFixingParser for self-correction using the explicit parser
+output_fixing_parser = OutputFixingParser.from_llm(
+    parser=final_reviews_parser, llm=llm_fin_gemini
+)
 
 
 # Schema for structured output to use in planning
@@ -403,9 +413,14 @@ final_prompt= ChatPromptTemplate.from_messages([
 
          - Examples for end_line_with_prefix when the end line is from new file: "+10, +2, +77, +65" 
          - Examples for end_line_with_prefix when the end line is from old file: "-1, -5, -22, -44" 
+      
+        {format_instructions}
     """),
     ("human", "PR data:\n{PR_data} \n\n Issues related: {Issues}"),
 ])
+
+# Manually construct the runnable chain
+structured_gemini_llm = final_prompt | llm_fin_gemini
 
 
 def final_review(pr_data: str, dependency_analysis: str) -> List[Dict]:
@@ -416,9 +431,23 @@ def final_review(pr_data: str, dependency_analysis: str) -> List[Dict]:
     print(final_issues) # Print the aggregated issues before sending to OpenAI
     print("------------------------")
 
+    # Define the input for the LLM call
+    llm_input = {
+        "PR_data": pr_data, 
+        "Issues": final_issues,
+        "format_instructions": final_reviews_parser.get_format_instructions()
+    }
+
+    raw_response_content = ""
+
     try:
         logging.info("Invoking LLM for final review...")
-        final_response = structured_gemini_llm.invoke(final_prompt.format_messages(PR_data=pr_data, Issues=final_issues))
+        # Get the raw response from the LLM
+        response_message = structured_gemini_llm.invoke(llm_input)
+        raw_response_content = response_message.content
+
+        # Attempt to parse the raw response
+        final_response = final_reviews_parser.parse(raw_response_content)
         
         if final_response is None or not hasattr(final_response, 'finalReviews'):
             logging.warning("LLM call for final review returned None or invalid response structure")
@@ -430,8 +459,19 @@ def final_review(pr_data: str, dependency_analysis: str) -> List[Dict]:
         
     except ValidationError as e:
         logging.error(f"Pydantic Validation Error in final_review: {e}")
-        print("Validation error in final review - returning empty list")
-        return []
+        logging.info("Attempting to fix the output using OutputFixingParser...")
+        try:
+            # Use the captured raw content for fixing
+            fixed_response = output_fixing_parser.parse(raw_response_content)
+            
+            logging.info(f"Self-correction successful. Found {len(fixed_response.finalReviews)} review items.")
+            print("done final review after self-correction")
+            return [review.model_dump() for review in fixed_response.finalReviews]
+
+        except Exception as fix_e:
+            logging.error(f"Failed to fix the output after retry: {fix_e}", exc_info=True)
+            print("Self-correction failed - returning empty list")
+            return []
     except Exception as e:
         logging.error(f"Unexpected Error in final_review: {e}", exc_info=True)
         print("Unexpected error in final review - returning empty list")
