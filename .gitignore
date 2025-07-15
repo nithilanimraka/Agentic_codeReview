@@ -8,3 +8,4 @@ faiss_index
 download_model.py
 start.sh
 build_parsers.py
+build_faiss_index.py
