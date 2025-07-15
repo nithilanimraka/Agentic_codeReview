@@ -28,6 +28,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY download_model.py .
 ARG HF_TOKEN
 ENV HF_TOKEN=${HF_TOKEN}
+ARG GOOGLE_API_KEY
+ENV GOOGLE_API_KEY=${GOOGLE_API_KEY}
 RUN python download_model.py
 
 # Copy the rest of your application source code into the container
@@ -38,6 +40,10 @@ RUN git submodule update --init --recursive
 
 # Build the tree-sitter parsers inside the container for the correct architecture
 RUN python src/duplicate_check/build_parsers.py
+
+# Build the FAISS index inside the container for the correct architecture
+RUN python build_faiss_index.py
+
 
 # Copy the startup script and make it executable
 COPY start.sh .
