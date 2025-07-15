@@ -43,6 +43,8 @@ jobs:
           dockerfilePath: Dockerfile
           # The name and tag for the new image
           imageToBuild: prreviewacr12345.azurecr.io/pr-review-app:${{ github.sha }}
+
+          environmentUrl: /subscriptions/70725dd9-0972-44f1-acd5-94ea97d28d1c/resourceGroups/pr-review-app-rg/providers/Microsoft.App/managedEnvironments/pr-review-env
           # 4. IMPORTANT: This adds your required build arguments
           buildArguments: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}
