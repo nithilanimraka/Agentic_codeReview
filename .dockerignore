@@ -1,12 +1,8 @@
-# Git
-.git
-.gitignore
-
 # Docker
 .dockerignore
 Dockerfile
 
-# Local environment
+# Local environment and caches
 __pycache__/
 *.pyc
 *.pyo
@@ -14,7 +10,7 @@ __pycache__/
 .env
 app.pem
 *.egg-info/
-.venv/
+venv/
 
 # Build artifacts
 build/

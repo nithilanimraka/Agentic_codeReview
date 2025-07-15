@@ -6,3 +6,5 @@ __pycache__/
 faiss_index
 .venv
 download_model.py
+start.sh
+build_parsers.py
