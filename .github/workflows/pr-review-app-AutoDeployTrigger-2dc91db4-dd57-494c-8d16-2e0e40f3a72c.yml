@@ -1,22 +1,21 @@
 name: Build and Deploy PR-Review-App
 
-# 1. This now triggers on pushes to the 'main' branch
 on:
   push:
     branches:
-      - master
+      - master # Corrected to use your 'master' branch
   workflow_dispatch:
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write # Required for OIDC login
+      id-token: write
       contents: read
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4 # 2. Updated to v4 and added submodule support
+        uses: actions/checkout@v4
         with:
           submodules: 'recursive'
 
@@ -27,25 +26,18 @@ jobs:
           tenant-id: ${{ secrets.PRREVIEWAPP_AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.PRREVIEWAPP_AZURE_SUBSCRIPTION_ID }}
 
-      # 3. This is the new, single step that builds and deploys
       - name: Build and Deploy to Azure Container App
         uses: azure/container-apps-deploy-action@v2
         with:
-          # The path to your source code
           appSourcePath: ${{ github.workspace }}
-          # The name of your container app
           containerAppName: pr-review-app
-          # Your Azure resource group
           resourceGroup: pr-review-app-rg
-          # The URL of your container registry
+          # --- THIS IS THE KEY FIX ---
+          # Use the correct parameter 'containerAppEnvironment' with just the name
+          containerAppEnvironment: pr-review-app-env
           registryUrl: prreviewacr12345.azurecr.io
-          # Path to your Dockerfile
           dockerfilePath: Dockerfile
-          # The name and tag for the new image
           imageToBuild: prreviewacr12345.azurecr.io/pr-review-app:${{ github.sha }}
-
-          environmentUrl: /subscriptions/70725dd9-0972-44f1-acd5-94ea97d28d1c/resourceGroups/pr-review-app-rg/providers/Microsoft.App/managedEnvironments/pr-review-env
-          # 4. IMPORTANT: This adds your required build arguments
           buildArguments: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}
             GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
