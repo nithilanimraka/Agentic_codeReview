@@ -11,6 +11,7 @@ ENV PYTHONUNBUFFERED 1
 # Install system dependencies that might be needed for your Python packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the requirements file first to leverage Docker layer caching
@@ -32,9 +33,20 @@ RUN python download_model.py
 # Copy the rest of your application source code into the container
 COPY . .
 
+# Initialize git submodules to fetch the parser source code
+RUN git submodule update --init --recursive
+
+# Build the tree-sitter parsers inside the container for the correct architecture
+RUN python src/duplicate_check/build_parsers.py
+
+# Copy the startup script and make it executable
+COPY start.sh .
+RUN chmod +x start.sh
+
 # Expose the port your FastAPI app runs on (as seen in your main.py)
 EXPOSE 8000
 
 # The command to run your application when the container starts
 # Note: --host 0.0.0.0 is crucial to make it accessible from outside the container
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Set the startup script as the command to run
+CMD ["./start.sh"]
