@@ -32,8 +32,6 @@ jobs:
           appSourcePath: ${{ github.workspace }}
           containerAppName: pr-review-app
           resourceGroup: pr-review-app-rg
-          # --- THIS IS THE KEY FIX ---
-          # Use the correct parameter 'containerAppEnvironment' with just the name
           containerAppEnvironment: pr-review-env
           registryUrl: prreviewacr12345.azurecr.io
           dockerfilePath: Dockerfile
