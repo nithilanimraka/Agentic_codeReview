@@ -5,7 +5,7 @@ app.pem
 __pycache__/
 faiss_index
 .venv
-download_model.py
-start.sh
-build_parsers.py
-build_faiss_index.py
+# download_model.py
+# start.sh
+# build_parsers.py
+# build_faiss_index.py
