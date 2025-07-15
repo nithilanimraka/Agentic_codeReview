@@ -13,6 +13,7 @@ import re
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.output_parsers import OutputFixingParser
 from langchain_core.output_parsers import PydanticOutputParser
+from langchain_core.exceptions import OutputParserException
 
 from src.code_review import prompt_templates
 
@@ -457,7 +458,7 @@ def final_review(pr_data: str, dependency_analysis: str) -> List[Dict]:
         print("done final review")
         return [review.model_dump() for review in final_response.finalReviews]
         
-    except ValidationError as e:
+    except (ValidationError, OutputParserException) as e:
         logging.error(f"Pydantic Validation Error in final_review: {e}")
         logging.info("Attempting to fix the output using OutputFixingParser...")
         try:
