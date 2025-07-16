@@ -1,4 +1,4 @@
-name: Build and Deploy PR-Review-App
+name: Build, Push, and Deploy to Azure
 
 on:
   push:
@@ -26,24 +26,24 @@ jobs:
           tenant-id: ${{ secrets.PRREVIEWAPP_AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.PRREVIEWAPP_AZURE_SUBSCRIPTION_ID }}
 
-      - name: Build and Deploy to Azure Container App
-        uses: azure/container-apps-deploy-action@v2
+      # This is the key missing step. It logs the Docker client into your ACR.
+      - name: Log in to Azure Container Registry
+        run: az acr login --name prreviewacr12345
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
         with:
-          # This tells the action to look at the entire repository for source code
-          appSourcePath: ${{ github.workspace }}
-          # The name of your existing container app
-          containerAppName: pr-review-app
-          # The name of your resource group
-          resourceGroup: pr-review-app-rg
-          # The name of your existing container apps environment
-          containerAppEnvironment: pr-review-env
-          # The URL of your container registry
-          registryUrl: prreviewacr12345.azurecr.io
-          # The path to your Dockerfile
-          dockerfilePath: Dockerfile
-          # The full name and tag for the new image that will be built
-          imageToBuild: prreviewacr12345.azurecr.io/pr-review-app:${{ github.sha }}
-          # The required arguments to pass to the Docker build command
-          buildArguments: |
+          context: .
+          file: Dockerfile
+          push: true
+          tags: prreviewacr12345.azurecr.io/pr-review-app:latest
+          build-args: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}
             GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
+
+      - name: Deploy new image to Container App
+        run: |
+          az containerapp update \
+            --name pr-review-app \
+            --resource-group pr-review-app-rg \
+            --image prreviewacr12345.azurecr.io/pr-review-app:latest
