@@ -134,7 +134,9 @@ def extract_notion_text(property_obj):
 
 def get_conversational_chain():
     prompt_template = """
-*🔍 PR Analysis Report*
+You are an expert AI assistant specialized in analyzing GitHub Pull Request titles and diffs.
+
+Please ONLY provide the PR analysis in the exact format below. Do NOT respond with any conversational phrases like "Okay", "I will analyze", or confirmations.
 
 You are provided with:
 •⁠  ⁠A *Pull Request Title*: "{title}"

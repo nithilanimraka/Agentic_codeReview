@@ -123,14 +123,16 @@ class FinalReview(BaseModel):
 class FinalReviews(BaseModel):
     finalReviews: List[FinalReview] = Field(..., description="Final Reviews of Data of the Code.",)
     
-# structured_gemini_llm = llm_fin_gemini.with_structured_output(FinalReviews)
+structured_final_llm = llm_fin_gemini.with_structured_output(FinalReviews)
 
 # Create an explicit Pydantic parser instance
 final_reviews_parser = PydanticOutputParser(pydantic_object=FinalReviews)
 
 # Create an OutputFixingParser for self-correction using the explicit parser
-output_fixing_parser = OutputFixingParser.from_llm(
-    parser=final_reviews_parser, llm=llm_fin_gemini
+robust_parser = OutputFixingParser.from_llm(
+    parser=final_reviews_parser,
+    llm=llm_fin_gemini,
+    max_retries=3,
 )
 
 
@@ -387,6 +389,10 @@ def invoke(structured_diff_text: str, dependency_analysis: dict = None) -> dict:
 
 #print(final_issues)
 
+def _sanitize_json(text: str) -> str:
+    """Escape orphan backslashes and raw newlines so json.loads never dies."""
+    text = re.sub(r"(?<!\\)\\(?![nrt\"\\/bfu])", r"\\\\", text)
+    return text.replace("\r\n", "\\n").replace("\n", "\\n")
 
 final_prompt= ChatPromptTemplate.from_messages([
      ("system", """
@@ -416,6 +422,8 @@ final_prompt= ChatPromptTemplate.from_messages([
          - Examples for end_line_with_prefix when the end line is from old file: "-1, -5, -22, -44" 
       
         {format_instructions}
+        
+        All newline characters inside `codeSegmentToFix` MUST be written as \\n.
     """),
     ("human", "PR data:\n{PR_data} \n\n Issues related: {Issues}"),
 ])
@@ -423,57 +431,78 @@ final_prompt= ChatPromptTemplate.from_messages([
 # Manually construct the runnable chain
 structured_gemini_llm = final_prompt | llm_fin_gemini
 
+structured_final_chain = (
+    final_prompt
+    | structured_final_llm
+)
+
 
 def final_review(pr_data: str, dependency_analysis: str) -> List[Dict]:
     print("Entered final review function")
      
-    final_issues=invoke(pr_data, dependency_analysis)
-    print("--- Collected Issues ---")
-    print(final_issues) # Print the aggregated issues before sending to OpenAI
-    print("------------------------")
+    issues_summary = invoke(pr_data, dependency_analysis)  # existing helper
 
-    # Define the input for the LLM call
-    llm_input = {
-        "PR_data": pr_data, 
-        "Issues": final_issues,
-        "format_instructions": final_reviews_parser.get_format_instructions()
+    payload_structured = {
+        "PR_data": pr_data,
+        "Issues": issues_summary,
     }
 
-    raw_response_content = ""
-
+    #1 First attempt: rely on model‑native structured output
     try:
-        logging.info("Invoking LLM for final review...")
-        # Get the raw response from the LLM
-        response_message = structured_gemini_llm.invoke(llm_input)
-        raw_response_content = response_message.content
+        logging.info("Calling structured output mode …")
+        response = structured_final_chain.invoke({
+            "PR_data": pr_data,
+            "Issues":  issues_summary,
+            "format_instructions": ""        
+        })
+        return [r.model_dump() for r in response.finalReviews]
+    except Exception as primary_err:
+        logging.warning("Structured route failed: %s", primary_err)
 
-        # Attempt to parse the raw response
-        final_response = final_reviews_parser.parse(raw_response_content)
-        
-        if final_response is None or not hasattr(final_response, 'finalReviews'):
-            logging.warning("LLM call for final review returned None or invalid response structure")
-            return []
-        
-        logging.info(f"Final review successful. Found {len(final_response.finalReviews)} review items.")
-        print("done final review")
-        return [review.model_dump() for review in final_response.finalReviews]
-        
-    except (ValidationError, OutputParserException) as e:
-        logging.error(f"Pydantic Validation Error in final_review: {e}")
-        logging.info("Attempting to fix the output using OutputFixingParser...")
+    #2 Fallback: text + robust parser
+    payload_text = {
+        **payload_structured,
+        "format_instructions": final_reviews_parser.get_format_instructions(),
+    }
+    raw = structured_gemini_llm.invoke(payload_text).content
+
+    # 2a. Try normal parser
+    try:
+        return [r.model_dump() for r in final_reviews_parser.parse(raw).finalReviews]
+    except Exception as parse_err:
+        logging.info("Initial parse failed (%s) – trying OutputFixingParser", parse_err)
+
+    # 2b. Try OutputFixingParser
+    try:
+        fixed = robust_parser.parse(raw)
+        return [r.model_dump() for r in fixed.finalReviews]
+    except Exception as fix_err:
+        logging.info("Fixer parser failed (%s) – trying sanitation", fix_err)
+
+    # 2c. Last‑ditch sanitation + manual Pydantic
+    try:
+        safe_raw = _sanitize_json(raw)
+        obj = json.loads(safe_raw)
+        validated = FinalReviews(**obj)
+        return [r.model_dump() for r in validated.finalReviews]
+    except Exception as final_err:
+        logging.info("dirtyjson also failed – attempting per‑item salvage")
         try:
-            # Use the captured raw content for fixing
-            fixed_response = output_fixing_parser.parse(raw_response_content)
-            
-            logging.info(f"Self-correction successful. Found {len(fixed_response.finalReviews)} review items.")
-            print("done final review after self-correction")
-            return [review.model_dump() for review in fixed_response.finalReviews]
-
-        except Exception as fix_e:
-            logging.error(f"Failed to fix the output after retry: {fix_e}", exc_info=True)
-            print("Self-correction failed - returning empty list")
-            return []
-    except Exception as e:
-        logging.error(f"Unexpected Error in final_review: {e}", exc_info=True)
-        print("Unexpected error in final review - returning empty list")
+            import dirtyjson  
+            safe_obj = dirtyjson.loads(raw)
+            validated = FinalReviews(**safe_obj)
+            return [r.model_dump() for r in validated.finalReviews]
+        except Exception:
+            # Per‑item salvage if top‑level still broken
+            salvaged: list[dict] = []
+            for m in re.finditer(r"\{[^{}]+\}", raw):
+                try:
+                    frag = dirtyjson.loads(m.group(0))
+                    salvaged.append(FinalReview(**frag).model_dump())
+                except Exception:
+                    continue
+            if salvaged:
+                logging.warning("Partial salvage succeeded: %d items", len(salvaged))
+                return salvaged
+        logging.error("Final review ultimately failed: %s", final_err, exc_info=True)
         return []
