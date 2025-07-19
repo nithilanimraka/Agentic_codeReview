@@ -1,5 +1,9 @@
 .env
 agentVenv
+<<<<<<< HEAD
+=======
+myenv
+>>>>>>> 412bd41149788f843b064f007efdb37f05c8cfa3
 app.pem
 __pycache__/
 faiss_index
