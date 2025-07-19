@@ -188,7 +188,7 @@ def chunk_diff_by_blocks(diff_content):
 def summarize_chunk(chunk):
     model = genai.GenerativeModel("models/gemini-1.5-flash", generation_config={"temperature": 0.3})
     prompt = (
-        "Analyze the following git diff and summarize it clearly. For each change, explain:\n"
+        "Analyze the following git diff and summarize it clearly.  **in no more than 100 words**. For each change, briefly explain:\n"
         "1. What was modified or added (the code difference).\n"
         "2. What problem or error it addresses (if any).\n"
         "3. What improvement or benefit the change provides.\n\n"
@@ -278,16 +278,16 @@ def analyze_pr(pr_title, pr_diff):
     chunks = chunk_diff_by_blocks(pr_diff)
     logger.info(f"Created {len(chunks)} chunks from PR diff")
     
-    # Step 2: Summarize each chunk (but don't store individual summaries)
-    chunk_contents = []
+    # Step 2: Summarize each chunk 
+    chunk_summaries = []
     for chunk in chunks:
-        chunk_contents.append(chunk)
+        summary = summarize_chunk(chunk)
+        chunk_summaries.append(summary)
     
-    # Combine all chunks for final analysis
-    combined_chunks = "\n\n".join(chunk_contents)
+
     
     # Step 3: Generate final comprehensive summary only
-    final_summary = generate_final_summary(pr_title, [combined_chunks], pr_diff)
+    final_summary = generate_final_summary(pr_title, chunk_summaries, pr_diff)
     
     # Simplified comment with only final review
     full_comment = f"""
