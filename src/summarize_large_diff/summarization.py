@@ -187,7 +187,7 @@ def chunk_diff_by_blocks(diff_content):
 def summarize_chunk(chunk):
     model = genai.GenerativeModel("models/gemini-1.5-flash", generation_config={"temperature": 0.3})
     prompt = (
-        "Analyze the following git diff and summarize it clearly. **in no more than 100 words**. For each change, briefly explain:\n"
+        "Analyze the following git diff and summarize it clearly. **in no more than 1500 words**. For each change, briefly explain:\n"
         "1. What was modified or added (the code difference).\n"
         "2. What problem or error it addresses (if any).\n"
         "3. What improvement or benefit the change provides.\n\n"
@@ -206,6 +206,9 @@ def generate_final_summary(pr_title, chunk_summaries, pr_diff):
     model = ChatGoogleGenerativeAI(model="models/gemini-2.0-flash", temperature=0.3)
     
     prompt_template = """
+    You are an expert AI assistant specialized in analyzing GitHub Pull Request titles and diffs.
+
+Please ONLY provide the PR analysis in the exact format below. Do NOT respond with any conversational phrases like "Okay", "I will analyze", or confirmations.
 **🔍 Comprehensive PR Analysis Report**
 
 **PR Title:** {title}
@@ -292,7 +295,7 @@ def analyze_pr(pr_title, pr_diff):
     full_comment = f"""
 ## 🚀 PR Analysis Report: {pr_title}
 
-### 📌 Comprehensive Review
+### 
 {final_summary}
 
 ### 🔍 Diff Summary
